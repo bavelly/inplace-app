@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>inplace Cost &amp; Profit Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@500;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: products on top, then a two-view switch (production cost / profit). Inputs on one side feed a sticky result panel; all-products table at the bottom. */
+:root{
+  --bg:#f4f5f6; --surface:#ffffff; --ink:#16191d; --muted:#626a73; --line:#dfe2e6;
+  --brass:#a87a1c; --brass-soft:#f3ead6;
+  --good:#1f7a4d; --good-bg:#e3f3ea; --warn:#9a6200; --warn-bg:#fbefd6; --bad:#b3261e; --bad-bg:#fbe4e2;
+  --display:"Readex Pro", "Segoe UI", system-ui, sans-serif;
+  --body:"IBM Plex Sans Arabic", "Segoe UI", Tahoma, system-ui, sans-serif;
+  --seg1:#3c4a5c; --seg2:#7a8797; --seg3:#5f7f9e; --seg4:#b9c3cf; --seg5:#c0634f; --seg6:#8b6aa8; --seg7:#9aa3ad; --seg8:#c9a24e;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121417; --surface:#1b1e22; --ink:#eceef0; --muted:#9aa2ab; --line:#2d3238;
+    --brass:#d9aa4c; --brass-soft:#2e2717;
+    --good:#5cc78f; --good-bg:#16291f; --warn:#e5b04f; --warn-bg:#2d2412; --bad:#f08a80; --bad-bg:#331b19;
+    --seg1:#8fa2b8; --seg2:#5d6977; --seg3:#7ea3c6; --seg4:#3f4954; --seg5:#d98270; --seg6:#a98cc4; --seg7:#6c757e; --seg8:#b8913f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121417; --surface:#1b1e22; --ink:#eceef0; --muted:#9aa2ab; --line:#2d3238;
+  --brass:#d9aa4c; --brass-soft:#2e2717;
+  --good:#5cc78f; --good-bg:#16291f; --warn:#e5b04f; --warn-bg:#2d2412; --bad:#f08a80; --bad-bg:#331b19;
+  --seg1:#8fa2b8; --seg2:#5d6977; --seg3:#7ea3c6; --seg4:#3f4954; --seg5:#d98270; --seg6:#a98cc4; --seg7:#6c757e; --seg8:#b8913f;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--body);}
+.wrap{max-width:1200px;margin:0 auto;padding:28px 20px 48px;display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font:700 28px/1.2 var(--display);margin:0;text-wrap:balance}
+h1 span{color:var(--brass);font-family:var(--display)}
+.sub{color:var(--muted);margin:6px 0 0;max-width:68ch}
+.btn{font:500 14px var(--body);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 12px;cursor:pointer}
+.btn:hover{border-color:var(--brass)}
+.btn.small{padding:4px 10px;font-size:13px}
+.btn.ghost{border-style:dashed;color:var(--muted)}
+.btn:focus-visible,input:focus-visible,select:focus-visible,.tab:focus-visible,.seg button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+
+.tabs{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tab{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:4px 4px 4px 14px;font:500 14px var(--body);cursor:pointer}
+.tab img,.tab .ph{width:30px;height:30px;border-radius:50%;object-fit:cover;background:var(--brass-soft)}
+.tab .ph{display:grid;place-items:center;color:var(--brass);font-weight:600}
+.tab[aria-selected="true"]{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass) inset;background:var(--brass-soft)}
+.tab.add{padding:8px 14px;border-style:dashed;color:var(--muted)}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:3px;gap:3px;align-self:flex-start}
+.seg button{font:600 15px var(--display);border:0;background:transparent;color:var(--muted);padding:8px 16px;border-radius:8px;cursor:pointer}
+.seg button[aria-selected="true"]{background:var(--ink);color:var(--surface)}
+
+.grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:880px){.grid{grid-template-columns:1fr}}
+[hidden]{display:none !important}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+.groups{display:flex;flex-direction:column;gap:16px}
+fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;min-width:0}
+legend{font:700 16px var(--display);padding:0;margin-bottom:10px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+legend small{font:400 13px var(--body);color:var(--muted)}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px 14px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f label{font-weight:500;font-size:14px}
+.f small{color:var(--muted);font-size:12.5px;line-height:1.4}
+.inp{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;background:var(--bg);overflow:hidden}
+.inp:focus-within{border-color:var(--brass)}
+.inp input,.inp select{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:500 15px var(--body);padding:8px 10px;font-variant-numeric:tabular-nums;outline:none}
+.inp select{cursor:pointer}
+.inp .u{padding:0 10px;color:var(--muted);font-size:12.5px;white-space:nowrap}
+.inp input:disabled{color:var(--brass);font-weight:600}
+.name-row{display:flex;gap:12px;align-items:center}
+.name-row img,.name-row .ph{width:64px;height:64px;border-radius:10px;object-fit:cover;flex:none;background:var(--brass-soft)}
+.name-row .ph{display:grid;place-items:center;color:var(--brass);font:700 22px var(--display)}
+.name-row .f{flex:1}
+hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+
+.card{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.card-h b{font:600 15px var(--display)}
+.chip{font-size:12.5px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-variant-numeric:tabular-nums}
+.chip strong{color:var(--ink)}
+.rowlist{display:flex;flex-direction:column;gap:8px}
+.filebar{display:contents}
+#reportHost{position:fixed;left:-20000px;top:0;width:1060px}
+.rep{background:#fff;color:#16191d;font:12.5px/1.5 var(--body);padding:28px 30px;direction:rtl}
+.rep h1{font:700 22px var(--display);margin:0 0 2px}
+.rep h1 span{color:#a87a1c}
+.rep .meta{color:#626a73;margin:0 0 14px;font-size:12px}
+.rep h2{font:700 15px var(--display);margin:18px 0 6px;color:#16191d}
+.rep table{width:100%;min-width:0;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.rep th{background:#f3ead6;color:#16191d;font-weight:600;font-size:11.5px;padding:6px 7px;border:1px solid #e3d9c2;text-align:right;white-space:normal}
+.rep td{padding:5px 7px;border:1px solid #e6e8eb;text-align:right;white-space:nowrap}
+.rep td.n{text-align:left}
+.rep tr{page-break-inside:avoid;break-inside:avoid}
+.rep .neg{color:#b3261e;font-weight:600}
+.rep .pos{color:#1f7a4d;font-weight:600}
+.rep .tot td{font-weight:700;background:#fafafa}
+.rep .foot{margin-top:16px;color:#626a73;font-size:11px}
+.rep .pb{page-break-before:always;break-before:page}
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  body{background:#fff}
+  body > *:not(#reportHost){display:none !important}
+  #reportHost{position:static;width:auto}
+  .rep{padding:0}
+}
+.ghbar{display:flex;flex-direction:column;gap:8px;padding:12px 14px}
+.gh-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.gh-row b{font:700 15px var(--display)}
+.gh-token{flex:1;min-width:220px}
+.btn.primary{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+body.locked .grid, body.locked .seg, body.locked #tabs, body.locked .wrap > section.panel:not(#ghbar), body.locked header > div:last-child{display:none !important}
+#lockNote{display:none}
+#reset{display:none !important}
+body.locked #lockNote{display:block}
+#ghStatus.ok{color:var(--good)} #ghStatus.err{color:var(--bad)} #ghStatus.warn{color:var(--warn)}
+.warnline{margin:0;font-size:13px;color:var(--warn);background:var(--warn-bg);border-radius:8px;padding:6px 10px}
+.acc{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:end}
+@media (max-width:520px){.acc{grid-template-columns:1fr 1fr}.acc .f:first-child{grid-column:1/-1}}
+
+.result{position:sticky;top:16px;display:flex;flex-direction:column;gap:16px}
+.hero{display:flex;flex-direction:column;gap:6px}
+.hero .lab{color:var(--muted);font-size:13.5px}
+.big{font:700 40px/1.1 var(--display);font-variant-numeric:tabular-nums}
+.big .cur{font-size:17px;color:var(--muted);font-weight:500;margin-right:6px}
+.pill{align-self:flex-start;font:600 12.5px var(--body);padding:3px 10px;border-radius:999px}
+.pill.good{background:var(--good-bg);color:var(--good)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.info{background:var(--brass-soft);color:var(--brass)}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.kpi .k{font-size:12.5px;color:var(--muted)}
+.kpi .v{font:700 20px var(--display);font-variant-numeric:tabular-nums}
+.kpi .n{font-size:12px;color:var(--muted)}
+.kpi.accent{border-color:var(--brass);background:var(--brass-soft)}
+.bar{display:flex;height:16px;border-radius:6px;overflow:hidden;background:var(--line)}
+.bar span{height:100%}
+.legend{display:flex;flex-direction:column;gap:5px;font-size:13.5px}
+.legend div{display:grid;grid-template-columns:12px 1fr auto auto;gap:8px;align-items:center;font-variant-numeric:tabular-nums}
+.legend i{width:10px;height:10px;border-radius:3px;display:block}
+.legend .pc{color:var(--muted);min-width:48px;text-align:left}
+.legend .tot{border-top:1px solid var(--line);padding-top:6px;font-weight:600}
+h2{font:700 17px var(--display);margin:0}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+.link{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--brass);background:var(--brass-soft);border-radius:10px;padding:10px 12px;font-size:14px}
+.link input{margin-top:5px;accent-color:var(--brass);width:16px;height:16px}
+
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:760px;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th:first-child,td:first-child{text-align:right}
+th{font-weight:600;color:var(--muted);font-size:12.5px}
+tr.cur td{background:var(--brass-soft)}
+td .pill{font-size:11.5px}
+.mini{width:100%;min-width:0;font-size:13.5px}
+.mini th,.mini td{padding:6px 4px}
+.foot{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center}
+@media (prefers-reduced-motion:no-preference){.bar span{transition:width .25s ease}}
+</style>
+</head>
+<body>
+<div id="reportHost" aria-hidden="true"></div>
+<div class="wrap">
+  <header>
+    <div>
+      <h1><span>inplace</span> · حاسبة التكلفة والربح</h1>
+      <p class="sub">احسب مصنعية السِت من المكنة والخامة والاسطمبة والكرتونة، وبعدين شوف هتكسب كام في كل أوردر بعد الشحن والإعلانات. الأرقام بتتحمّل من GitHub بالتوكن.</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="dup" type="button">نسخ المنتج</button>
+      <button class="btn" id="del" type="button">حذف المنتج</button>
+      <button class="btn" id="reset" type="button">رجّع الأمثلة</button>
+      <span class="filebar" hidden>
+        <button class="btn" id="exportPdf" type="button">تصدير PDF</button>
+        <button class="btn" id="exportCsv" type="button">تصدير تقرير (Excel)</button>
+        <button class="btn" id="saveJson" type="button">حفظ ملف البيانات</button>
+        <label class="btn" for="loadJson">فتح ملف بيانات</label>
+        <input type="file" id="loadJson" accept=".json,application/json" hidden>
+      </span>
+    </div>
+  </header>
+
+  <section class="panel ghbar" id="ghbar" hidden>
+    <div class="gh-row">
+      <b>GitHub</b>
+      <div class="inp gh-token"><input id="ghToken" type="password" autocomplete="off" placeholder="الصق التوكن هنا (github_pat_…)" aria-label="توكن GitHub"></div>
+      <button class="btn" id="ghConnect" type="button">اتصل وحمّل آخر أرقام</button>
+      <button class="btn primary" id="ghSave" type="button" hidden>احفظ على GitHub وارفع تقرير</button>
+      <button class="btn small" id="ghForget" type="button" hidden>افصل</button>
+    </div>
+    <p class="note" id="lockNote">الحاسبة مقفولة. الأرقام محفوظة على GitHub (private)، والصفحة دي مش بتظهر أي رقم من غير توكن.</p>
+    <p class="note" id="ghStatus">التوكن بيتحفظ على المتصفح ده بس، ومش بيتبعت لأي مكان غير GitHub.</p>
+  </section>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="المنتجات"></nav>
+
+  <div class="seg" role="tablist" aria-label="الحساب">
+    <button type="button" role="tab" id="vProd" data-view="production">١ · تكلفة الإنتاج (المصنعية)</button>
+    <button type="button" role="tab" id="vProfit" data-view="profit">٢ · الربح والتسعير</button>
+  </div>
+
+  <!-- ===== Production view ===== -->
+  <div class="grid" id="viewProduction">
+    <form class="panel groups" id="pform" autocomplete="off">
+      <div class="name-row">
+        <span class="thumb"></span>
+        <div class="f">
+          <label for="pname">اسم المنتج</label>
+          <div class="inp"><input id="pname" data-k="name" type="text"></div>
+        </div>
+      </div>
+      <hr>
+      <fieldset>
+        <legend>الأجزاء اللي بتتحقن <small>كل قطعة في السِت ومكنتها</small></legend>
+        <div class="rowlist" id="parts"></div>
+        <button type="button" class="btn ghost" id="addPart">+ إضافة جزء</button>
+      </fieldset>
+      <hr>
+      <fieldset>
+        <legend>إكسسوارات وتشطيب <small>مقابض، تلبيس، مسامير، استيكر…</small></legend>
+        <div class="rowlist" id="accs"></div>
+        <button type="button" class="btn ghost" id="addAcc">+ إضافة بند</button>
+      </fieldset>
+      <hr>
+      <fieldset>
+        <legend>الكرتونة والتغليف</legend>
+        <div class="fields">
+          <div class="f"><label for="carton">سعر الكرتونة</label><div class="inp"><input id="carton" data-k="carton" type="number" min="0" step="any"><span class="u">جنيه</span></div></div>
+          <div class="f"><label for="perCarton">كام سِت في الكرتونة</label><div class="inp"><input id="perCarton" data-k="perCarton" type="number" min="1" step="1"><span class="u">سِت</span></div></div>
+          <div class="f"><label for="inner">تغليف داخلي للسِت</label><div class="inp"><input id="inner" data-k="inner" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>فوم، نايلون، فواصل</small></div>
+        </div>
+      </fieldset>
+      <hr>
+      <fieldset>
+        <legend>هالك واسطمبة ومصاريف تانية</legend>
+        <div class="fields">
+          <div class="f"><label for="scrap">القطع المرفوضة</label><div class="inp"><input id="scrap" data-k="scrap" type="number" min="0" max="90" step="any"><span class="u">%</span></div><small>قطع بتطلع بايظة وبتترمي</small></div>
+          <div class="f"><label for="amort">وزّع الاسطمبات على</label><div class="inp"><input id="amort" data-k="amort" type="number" min="0" step="1"><span class="u">سِت</span></div><small>٠ لو الاسطمبة مدفوعة ومش عايز تحسبها</small></div>
+          <div class="f"><label for="otherSet">مصاريف تانية للسِت</label><div class="inp"><input id="otherSet" data-k="otherSet" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>نقل، تشطيب يدوي، تغليف عمالة</small></div>
+        </div>
+      </fieldset>
+      <hr>
+      <fieldset>
+        <legend>المكن <small>Hwamda · مشتركة بين كل المنتجات</small></legend>
+        <p class="note">الكهربا محسوبة من قدرة الموتور والسخانات اللي على لوحة المكنة: السيرفو بيسحب في المتوسط حوالي ٤٠٪ من قدرة الموتور، والطلمبة الثابتة حوالي ٧٥٪، والسخانات حوالي ٤٠٪ بعد ما الماكينة تسخن. كهربا القطعة = كهربا الساعة ÷ عدد القطع في الساعة، فكل ما زمن الدورة يقل كهربا القطعة بتقل.</p>
+        <div class="fields">
+          <div class="f"><label for="kwh">سعر الكيلووات ساعة</label><div class="inp"><input id="kwh" data-g="kwh" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>من فاتورة كهربا المصنع</small></div>
+          <div class="f"><label for="wage">مرتب العامل في الشهر</label><div class="inp"><input id="wage" data-g="wage" type="number" min="0" step="any"><span class="u">جنيه</span></div></div>
+          <div class="f"><label for="hours">ساعات شغل العامل في الشهر</label><div class="inp"><input id="hours" data-g="hours" type="number" min="1" step="1"><span class="u">ساعة</span></div><small>٢٦ يوم × ٨ ساعات = ٢٠٨</small></div>
+        </div>
+        <div class="rowlist" id="machines"></div>
+        <button type="button" class="btn ghost" id="addMachine">+ إضافة مكنة</button>
+      </fieldset>
+    </form>
+
+    <aside class="panel result" aria-live="polite">
+      <div class="hero">
+        <span class="lab">تكلفة إنتاج السِت</span>
+        <div class="big" id="setCost">0</div>
+        <span class="pill info" id="capacity"></span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <h2>التكلفة رايحة فين</h2>
+        <div class="bar" id="pbar" role="img" aria-label="تقسيم تكلفة الإنتاج"></div>
+        <div class="legend" id="plegend"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <h2>تكلفة كل جزء</h2>
+        <table class="mini"><thead><tr><th>الجزء</th><th>خامة</th><th>مكنة</th><th>القطعة</th><th>قطعة/ساعة</th></tr></thead><tbody id="partRows"></tbody></table>
+      </div>
+      <label class="link"><input type="checkbox" id="useProd"><span>استخدم تكلفة الإنتاج دي كتكلفة المنتج في حساب الربح</span></label>
+    </aside>
+  </div>
+
+  <!-- ===== Profit view ===== -->
+  <div class="grid" id="viewProfit">
+    <form class="panel groups" id="form" autocomplete="off">
+      <div class="name-row">
+        <span class="thumb"></span>
+        <div class="f">
+          <label for="name">اسم المنتج</label>
+          <div class="inp"><input id="name" type="text"></div>
+        </div>
+      </div>
+      <hr>
+      <fieldset>
+        <legend>المنتج والسعر</legend>
+        <div class="fields">
+          <div class="f"><label for="cost">تكلفة المنتج</label><div class="inp"><input id="cost" type="number" min="0" step="any"><span class="u">جنيه</span></div><small id="costNote">تمن السِت (من المصنع أو المورد)</small></div>
+          <div class="f"><label for="price">سعر البيع</label><div class="inp"><input id="price" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>السعر على الويبسايت</small></div>
+          <div class="f"><label for="disc">خصم</label><div class="inp"><input id="disc" type="number" min="0" max="99" step="any"><span class="u">%</span></div><small>لو فيه خصم أو كوبون</small></div>
+          <div class="f"><label for="pack">تغليف الشحن</label><div class="inp"><input id="pack" type="number" min="0" step="any"><span class="u">جنيه / أوردر</span></div><small>كرتونة الشحن، بابلز، كارت شكر</small></div>
+        </div>
+      </fieldset>
+      <hr>
+      <fieldset>
+        <legend>الشحن والتوصيل</legend>
+        <div class="fields">
+          <div class="f"><label for="shipOut">الشحن اللي بتدفعه</label><div class="inp"><input id="shipOut" type="number" min="0" step="any"><span class="u">جنيه / أوردر</span></div><small>لشركة الشحن</small></div>
+          <div class="f"><label for="shipIn">الشحن اللي العميل بيدفعه</label><div class="inp"><input id="shipIn" type="number" min="0" step="any"><span class="u">جنيه / أوردر</span></div><small>٠ لو الشحن مجاني</small></div>
+          <div class="f"><label for="refuse">أوردرات بترجع / بتترفض</label><div class="inp"><input id="refuse" type="number" min="0" max="95" step="any"><span class="u">%</span></div><small>نسبة المرتجع في الدفع عند الاستلام</small></div>
+          <div class="f"><label for="retShip">شحن المرتجع</label><div class="inp"><input id="retShip" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>لكل أوردر بيرجع</small></div>
+        </div>
+      </fieldset>
+      <hr>
+      <fieldset>
+        <legend>العمولات</legend>
+        <div class="fields">
+          <div class="f"><label for="payPct">عمولة التحصيل / الدفع</label><div class="inp"><input id="payPct" type="number" min="0" step="any"><span class="u">% من الأوردر</span></div></div>
+          <div class="f"><label for="payFix">رسوم ثابتة على الأوردر</label><div class="inp"><input id="payFix" type="number" min="0" step="any"><span class="u">جنيه</span></div></div>
+          <div class="f"><label for="shopPct">عمولة Shopify</label><div class="inp"><input id="shopPct" type="number" min="0" step="any"><span class="u">%</span></div><small>Basic ‎2% · Grow ‎1% · Advanced ‎0.6% مع بوابة دفع خارجية</small></div>
+        </div>
+      </fieldset>
+      <hr>
+      <fieldset>
+        <legend>الإعلانات والمصاريف الشهرية</legend>
+        <div class="fields">
+          <div class="f"><label for="cpa">صرف الإعلانات للأوردر</label><div class="inp"><input id="cpa" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>CPA: صرف الإعلانات ÷ عدد الأوردرات</small></div>
+          <div class="f"><label for="monthly">مصاريف شهرية ثابتة</label><div class="inp"><input id="monthly" type="number" min="0" step="any"><span class="u">جنيه / شهر</span></div><small>Shopify، أبلكيشنز، تصوير، مرتبات</small></div>
+          <div class="f"><label for="orders">أوردرات في الشهر</label><div class="inp"><input id="orders" type="number" min="1" step="1"><span class="u">أوردر</span></div><small>كل الأوردرات (كل المنتجات)</small></div>
+          <div class="f"><label for="target">نسبة الربح المطلوبة</label><div class="inp"><input id="target" type="number" min="0" max="90" step="any"><span class="u">%</span></div><small>من الفلوس اللي بتتحصل</small></div>
+        </div>
+      </fieldset>
+    </form>
+
+    <aside class="panel result" aria-live="polite">
+      <div class="hero">
+        <span class="lab">الربح في الأوردر اللي بيتسلم</span>
+        <div class="big" id="profit">0</div>
+        <span class="pill" id="status"></span>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><span class="k">نسبة الربح</span><span class="v" id="margin">0%</span><span class="n" id="marginN"></span></div>
+        <div class="kpi"><span class="k">الربح في الشهر</span><span class="v" id="month">0</span><span class="n" id="monthN"></span></div>
+        <div class="kpi"><span class="k">أقصى صرف إعلانات للأوردر</span><span class="v" id="beCpa">0</span><span class="n">بعده بتخسر</span></div>
+        <div class="kpi"><span class="k">سعر التعادل</span><span class="v" id="bePrice">0</span><span class="n">لا مكسب ولا خسارة</span></div>
+        <div class="kpi accent" style="grid-column:1/-1"><span class="k" id="sugK">السعر المطلوب</span><span class="v" id="sugPrice">0</span><span class="n" id="sugN"></span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <h2>فلوس الأوردر رايحة فين</h2>
+        <div class="bar" id="bar" role="img" aria-label="تقسيم تكلفة الأوردر"></div>
+        <div class="legend" id="legend"></div>
+        <p class="note">لكل أوردر بيتسلم. الإعلانات وشحن المرتجع والمصاريف الشهرية متوزعة على الأوردرات اللي اتسلمت فعلاً.</p>
+      </div>
+    </aside>
+  </div>
+
+  <section class="panel" style="display:flex;flex-direction:column;gap:12px">
+    <div class="foot"><h2>كل المنتجات</h2><span class="note">دوس على أي صف عشان تعدّله.</span></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>المنتج</th><th>تكلفة الإنتاج</th><th>سعر البيع</th><th>إجمالي التكلفة / أوردر</th><th>الربح / أوردر</th><th>نسبة الربح</th><th>أقصى CPA</th><th>السعر المطلوب</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="note">كل الأرقام بالجنيه. الضرايب والقيمة المضافة مش محسوبة. المنتجات بتتحفظ على المتصفح ده بس.</p>
+  </section>
+</div>
+
+<script>
+const num = x => { const n = Number(x); return isFinite(n) && n > 0 ? n : 0; };
+const PUBLIC = true;
+const IMG = {};
+const KEYS = ["cost","price","disc","pack","shipOut","shipIn","refuse","retShip","payPct","payFix","shopPct","cpa","monthly","orders","target"];
+const SHARED = {pack:0, shipOut:0, shipIn:0, refuse:0, retShip:0, payPct:0, payFix:0, shopPct:0, cpa:0, monthly:0, orders:1, target:0, disc:0};
+const parts = () => [];
+/* Hwamda machines. Motor and heater kW: HMD168M8 listing (15 / 9.8 kW); 108 t and 268 t are estimates scaled from it and from Hwamda's 268 t table. Replace with the nameplate. */
+const MACHINES = () => [
+  {id:"h108", tons:108, motorKw:11, heaterKw:7, drive:"servo", shotG:160, workers:1, extra:25},
+  {id:"h170", tons:170, motorKw:15, heaterKw:9.8, drive:"servo", shotG:252, workers:1, extra:35},
+  {id:"h268", tons:268, motorKw:30, heaterKw:15, drive:"servo", shotG:716, workers:1, extra:50}
+];
+/* Share of nameplate power drawn on average while running: servo pumps idle during cooling; heaters cycle on and off once the barrel is hot. */
+const DRAW = {servo:0.40, fixed:0.75, heater:0.40};
+const shotOf = pt => num(pt.weight) * Math.max(1, num(pt.cav)) * (1 + num(pt.waste)/100);
+function bestMachine(machines, shot){
+  const fit = machines.filter(m => !num(m.shotG) || num(m.shotG) >= shot).sort((a,b) => num(a.tons) - num(b.tons));
+  return (fit[0] || machines.slice().sort((a,b) => num(b.tons) - num(a.tons))[0]).id;
+}
+const P = (name, qty, machine, weight, cycle, cav, mold) => {
+  const pt = {name, qty, machine, weight, waste:3, mat:90, cycle, cav, mold};
+  if (!pt.machine) pt.machine = bestMachine(MACHINES(), shotOf(pt));
+  return pt;
+};
+/* Public copy: no product data ships with the page; it loads from the private repo with a token. */
+const PRODUCTS = () => [Object.assign({id:"blank", name:"—", img:null, cost:0, price:0, useProd:true,
+  prod:{parts:[P("—", 1, null, 0, 0, 1, 0)], accs:[], carton:0, perCarton:1, inner:0, scrap:0, amort:0, otherSet:0}}, SHARED)];
+const EXAMPLE_STATE = () => ({ seed:3, view:"production", cur:"blank", g:{kwh:0, wage:0, hours:208}, machines:MACHINES(), products:PRODUCTS() });
+const STORE = "inplace-cost-calc-v2";
+let state;
+try { state = JSON.parse(localStorage.getItem(STORE)); } catch(e) { state = null; }
+if (!state || !Array.isArray(state.products) || !state.products.length || !Array.isArray(state.machines)) state = EXAMPLE_STATE();
+if ((state.seed || 1) < 2) {
+  // Earlier save: keep the user's edits, add the store's other products and the 160-ton example machine.
+  PRODUCTS().forEach(np => {
+    const old = state.products.find(p => p.id === np.id);
+    if (!old) state.products.push(np);
+    else if ((np.id === "gold" && old.price === 1450) || (np.id === "silver" && old.price === 1350)) { old.price = 650; old.name = np.name; }
+  });
+  state.seed = 2;
+}
+if (state.seed < 3) {
+  // Swap the example machines for the factory's Hwamda 108 / 170 / 268 t, convert any machine the user added, and re-seat parts that used an example machine.
+  const old = ["m160","m250","m400"];
+  const kept = state.machines.filter(m => !old.includes(m.id)).map(m => m.motorKw != null ? m :
+    Object.assign({}, m, {motorKw: num(m.kw), heaterKw: 0, drive: "fixed", shotG: 0}));
+  state.machines = MACHINES().concat(kept);
+  state.products.forEach(p => p.prod && p.prod.parts.forEach(pt => {
+    if (!state.machines.some(m => m.id === pt.machine)) pt.machine = bestMachine(MACHINES(), shotOf(pt));
+  }));
+  state.seed = 3;
+}
+const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch(e) {} };
+const cur = () => state.products.find(p => p.id === state.cur) || state.products[0];
+const uid = p => p + Date.now().toString(36) + Math.floor(Math.random()*1e4);
+const blankProd = () => ({parts:[{name:"جزء ١", qty:1, machine:bestMachine(state.machines, 309), weight:300, waste:3, mat:90, cycle:45, cav:1, mold:0}], accs:[], carton:0, perCarton:1, inner:0, scrap:3, amort:0, otherSet:0});
+
+const fmt = n => isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—";
+const fmt1 = n => !isFinite(n) ? "—" : Math.abs(n) < 100 ? (Math.round(n*10)/10).toLocaleString("en-US") : fmt(n);
+const pct = n => isFinite(n) ? (Math.round(n*10)/10).toLocaleString("en-US") + "%" : "—";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- production math ---------- */
+function machineRate(m){
+  const g = state.g;
+  const kwhPerHour = num(m.motorKw) * (m.drive === "fixed" ? DRAW.fixed : DRAW.servo) + num(m.heaterKw) * DRAW.heater;
+  const elec = kwhPerHour * num(g.kwh);
+  const labor = num(m.workers) * num(g.wage) / Math.max(1, num(g.hours));
+  const extra = num(m.extra);
+  return {kwhPerHour, elec, labor, extra, total: elec + labor + extra};
+}
+function prodCalc(p){
+  const pr = p.prod || blankProd();
+  const scrap = Math.min(num(pr.scrap), 90) / 100;
+  let material = 0, elec = 0, labor = 0, extra = 0, moldTotal = 0, setsPerHour = Infinity;
+  const rows = pr.parts.map(pt => {
+    const m = state.machines.find(x => x.id === pt.machine) || state.machines[0];
+    const rate = machineRate(m);
+    const perHour = num(pt.cycle) ? 3600 / num(pt.cycle) * Math.max(1, num(pt.cav)) : 0;
+    const good = perHour * (1 - scrap);
+    const mat = num(pt.weight)/1000 * (1 + num(pt.waste)/100) * num(pt.mat) / (1 - scrap);
+    const mach = good ? rate.total / good : NaN;
+    const q = num(pt.qty);
+    material += mat * q;
+    if (good) { elec += rate.elec/good*q; labor += rate.labor/good*q; extra += rate.extra/good*q; }
+    moldTotal += num(pt.mold);
+    if (q && good) setsPerHour = Math.min(setsPerHour, good / q);
+    const shot = shotOf(pt);
+    return {name: pt.name, mat, mach, piece: mat + mach, good, tons: m.tons, kwhPiece: good ? rate.kwhPerHour/good : NaN,
+      over: num(m.shotG) && shot > num(m.shotG) ? {shot, cap: num(m.shotG)} : null};
+  });
+  const accs = pr.accs.reduce((s,a) => s + num(a.price)*num(a.qty), 0);
+  const pack = num(pr.carton) / Math.max(1, num(pr.perCarton)) + num(pr.inner);
+  const mold = num(pr.amort) ? moldTotal / num(pr.amort) : 0;
+  const other = num(pr.otherSet);
+  const total = material + elec + labor + extra + accs + pack + mold + other;
+  return {rows, total, setsPerHour: isFinite(setsPerHour) ? setsPerHour : 0, moldTotal,
+    parts:[["الخامة",material,"--seg1"],["كهربا المكنة",elec,"--seg3"],["عمالة",labor,"--seg2"],["صيانة وإهلاك",extra,"--seg7"],
+           ["إكسسوارات وتشطيب",accs,"--seg8"],["كرتونة وتغليف",pack,"--seg4"],["الاسطمبة",mold,"--seg6"],["مصاريف تانية",other,"--seg5"]]};
+}
+const effCost = p => p.useProd && p.prod ? prodCalc(p).total : num(p.cost);
+
+/* ---------- profit math ---------- */
+function calc(p){
+  const v = k => num(p[k]);
+  const cost = effCost(p);
+  const r = Math.min(v("refuse"), 95) / 100;
+  const d = Math.min(v("disc"), 99) / 100;
+  const revenue = v("price") * (1 - d) + v("shipIn");
+  const pctFees = (v("payPct") + v("shopPct")) / 100;
+  const fees = revenue * pctFees + v("payFix");
+  const ads = v("cpa") / (1 - r);
+  const refusal = r / (1 - r) * (v("shipOut") + v("retShip") + v("pack"));
+  const overhead = v("monthly") / (Math.max(1, v("orders")) * (1 - r));
+  const fixed = cost + v("pack") + v("shipOut") + v("payFix") + ads + refusal + overhead;
+  const totalCost = fixed + revenue * pctFees;
+  const profit = revenue - totalCost;
+  const margin = revenue > 0 ? profit / revenue * 100 : NaN;
+  const priceFor = mm => (1 - pctFees - mm) > 0 ? (fixed / (1 - pctFees - mm) - v("shipIn")) / (1 - d) : NaN;
+  const delivered = Math.max(1, v("orders")) * (1 - r);
+  return {cost, revenue, totalCost, profit, margin, beCpa:(profit + ads) * (1 - r),
+    bePrice: priceFor(0), sugPrice: priceFor(v("target")/100), target: v("target"), delivered, monthProfit: profit * delivered,
+    parts:[["تكلفة المنتج",cost,"--seg1"],["تغليف الشحن",v("pack"),"--seg4"],["الشحن",v("shipOut"),"--seg3"],["العمولات",fees,"--seg2"],
+           ["الإعلانات",ads,"--seg5"],["المرتجعات",refusal,"--seg6"],["المصاريف الشهرية",overhead,"--seg7"]]};
+}
+function status(c){
+  if (c.profit < 0) return ["bad", "بتخسر في كل أوردر"];
+  if (c.margin < c.target) return ["warn", "كسبان، بس أقل من النسبة اللي عايزها"];
+  return ["good", "كويس: وصلت للنسبة اللي عايزها أو أكتر"];
+}
+
+/* ---------- rendering ---------- */
+const $ = id => document.getElementById(id);
+const thumbHTML = p => p.img && IMG[p.img] ? `<img src="${IMG[p.img]}" alt="">` : `<span class="ph">${esc((p.name||"?").trim().charAt(0).toUpperCase())}</span>`;
+function barHTML(parts, extra, base){
+  base = base || 1;
+  return parts.map(([l,v,c]) => `<span title="${l}" style="width:${Math.max(0,v)/base*100}%;background:var(${c})"></span>`).join("") + (extra||"");
+}
+function legendHTML(parts, base){
+  return parts.filter(([,v]) => v > 0.005).map(([l,v,c]) => `<div><i style="background:var(${c})"></i><span>${l}</span><span>${fmt1(v)}</span><span class="pc">${pct(base ? v/base*100 : NaN)}</span></div>`).join("");
+}
+function renderTabs(){
+  $("tabs").innerHTML = state.products.map(p =>
+    `<button type="button" class="tab" role="tab" aria-selected="${p.id===state.cur}" data-id="${p.id}">${thumbHTML(p)}<span>${esc(p.name||"بدون اسم")}</span></button>`
+  ).join("") + `<button type="button" class="tab add" id="add">+ منتج جديد</button>`;
+  document.querySelectorAll(".thumb").forEach(t => t.innerHTML = thumbHTML(cur()));
+}
+function renderView(){
+  const prod = state.view !== "profit";
+  $("viewProduction").hidden = !prod; $("viewProfit").hidden = prod;
+  $("vProd").setAttribute("aria-selected", prod); $("vProfit").setAttribute("aria-selected", !prod);
+}
+function machineOptions(sel){
+  return state.machines.map(m => `<option value="${m.id}" ${m.id===sel?"selected":""}>${esc(m.tons)} طن</option>`).join("");
+}
+const F = (label, attrs, unit, hint) => `<div class="f"><label>${label}</label><div class="inp"><input ${attrs}>${unit?`<span class="u">${unit}</span>`:""}</div>${hint?`<small>${hint}</small>`:""}</div>`;
+function renderProdForm(){
+  const p = cur(); if (!p.prod) p.prod = blankProd(); const pr = p.prod;
+  $("pname").value = p.name || "";
+  ["carton","perCarton","inner","scrap","amort","otherSet"].forEach(k => $(k).value = pr[k]);
+  ["kwh","wage","hours"].forEach(k => $(k).value = state.g[k]);
+  $("parts").innerHTML = pr.parts.map((pt,i) => `
+    <div class="card" data-scope="part" data-i="${i}">
+      <div class="card-h"><b>${esc(pt.name || "جزء")}</b><span class="chip" data-out="part-${i}"></span>
+        <button type="button" class="btn small" data-act="delPart" data-i="${i}">حذف</button></div>
+      <div class="fields">
+        ${F("اسم الجزء", `type="text" data-k="name" value="${esc(pt.name)}"`)}
+        ${F("العدد في السِت", `type="number" min="0" step="1" data-k="qty" value="${pt.qty}"`, "قطعة")}
+        <div class="f"><label>المكنة</label><div class="inp"><select data-k="machine">${machineOptions(pt.machine)}</select></div></div>
+        ${F("وزن القطعة", `type="number" min="0" step="any" data-k="weight" value="${pt.weight}"`, "جرام", "على الميزان بعد الحقن")}
+        ${F("سعر الخامة", `type="number" min="0" step="any" data-k="mat" value="${pt.mat}"`, "جنيه / كيلو")}
+        ${F("هالك المصبات", `type="number" min="0" step="any" data-k="waste" value="${pt.waste}"`, "%", "رنر ومصبات مش بترجع")}
+        ${F("زمن الدورة", `type="number" min="0" step="any" data-k="cycle" value="${pt.cycle}"`, "ثانية", "من قفل الاسطمبة للقفلة اللي بعدها")}
+        ${F("عدد العيون", `type="number" min="1" step="1" data-k="cav" value="${pt.cav}"`, "عين", "قطع في الحقنة الواحدة")}
+        ${F("سعر الاسطمبة", `type="number" min="0" step="any" data-k="mold" value="${pt.mold}"`, "جنيه")}
+      </div>
+      <p class="warnline" data-warn="part-${i}" hidden></p>
+    </div>`).join("");
+  $("accs").innerHTML = pr.accs.length ? pr.accs.map((a,i) => `
+    <div class="acc" data-scope="acc" data-i="${i}">
+      ${F("البند", `type="text" data-k="name" value="${esc(a.name)}"`)}
+      ${F("السعر", `type="number" min="0" step="any" data-k="price" value="${a.price}"`, "جنيه")}
+      ${F("العدد في السِت", `type="number" min="0" step="any" data-k="qty" value="${a.qty}"`)}
+      <button type="button" class="btn small" data-act="delAcc" data-i="${i}" style="margin-bottom:6px">حذف</button>
+    </div>`).join("") : `<p class="note">مفيش إكسسوارات لسه.</p>`;
+  $("machines").innerHTML = state.machines.map((m,i) => `
+    <div class="card" data-scope="machine" data-i="${i}">
+      <div class="card-h"><b>مكنة ${esc(m.tons)} طن</b><span class="chip" data-out="mach-${i}"></span>
+        <button type="button" class="btn small" data-act="delMachine" data-i="${i}">حذف</button></div>
+      <div class="fields">
+        ${F("قوة القفل", `type="number" min="0" step="any" data-k="tons" value="${m.tons}"`, "طن")}
+        <div class="f"><label>نوع الطلمبة</label><div class="inp"><select data-k="drive">
+          <option value="servo" ${m.drive!=="fixed"?"selected":""}>سيرفو (موفّرة)</option>
+          <option value="fixed" ${m.drive==="fixed"?"selected":""}>طلمبة ثابتة (قديمة)</option></select></div><small>السيرفو بيهدى وقت التبريد</small></div>
+        ${F("قدرة الموتور", `type="number" min="0" step="any" data-k="motorKw" value="${m.motorKw}"`, "كيلووات", "Pump motor power على لوحة المكنة")}
+        ${F("قدرة السخانات", `type="number" min="0" step="any" data-k="heaterKw" value="${m.heaterKw}"`, "كيلووات", "Heater power على لوحة المكنة")}
+        ${F("أقصى وزن حقنة", `type="number" min="0" step="any" data-k="shotG" value="${m.shotG}"`, "جرام", "Shot weight (PS)، ٠ لو مش عارف")}
+        ${F("عمال على المكنة", `type="number" min="0" step="any" data-k="workers" value="${m.workers}"`, "عامل")}
+        ${F("صيانة وإهلاك وإيجار", `type="number" min="0" step="any" data-k="extra" value="${m.extra}"`, "جنيه / ساعة")}
+      </div>
+    </div>`).join("");
+  $("useProd").checked = !!p.useProd;
+}
+function renderProdResult(){
+  const p = cur(); const c = prodCalc(p);
+  $("setCost").innerHTML = `${fmt1(c.total)}<span class="cur">جنيه</span>`;
+  $("capacity").textContent = c.setsPerHour ? `أبطأ جزء بيطلع حوالي ${fmt(c.setsPerHour)} سِت في الساعة · ${fmt(c.setsPerHour*8)} في وردية ٨ ساعات` : "كمّل بيانات الأجزاء";
+  $("pbar").innerHTML = barHTML(c.parts, "", c.total);
+  $("plegend").innerHTML = legendHTML(c.parts, c.total) + `<div class="tot"><i style="background:var(--ink)"></i><span>إجمالي السِت</span><span>${fmt1(c.total)}</span><span class="pc">100%</span></div>`;
+  $("partRows").innerHTML = c.rows.map(r => `<tr><td>${esc(r.name)}</td><td>${fmt1(r.mat)}</td><td>${fmt1(r.mach)}</td><td><b>${fmt1(r.piece)}</b></td><td>${fmt(r.good)}</td></tr>`).join("");
+  c.rows.forEach((r,i) => {
+    const el = document.querySelector(`[data-out="part-${i}"]`);
+    if (el) el.innerHTML = `القطعة <strong>${fmt1(r.piece)}</strong> جنيه · ${fmt(r.good)} قطعة/ساعة · كهربا ${(Math.round(r.kwhPiece*1000)/1000).toLocaleString("en-US")} ك.و.س`;
+    const w = document.querySelector(`[data-warn="part-${i}"]`);
+    if (w) { w.hidden = !r.over; if (r.over) w.textContent = `الحقنة حوالي ${fmt(r.over.shot)} جرام وده أكبر من طاقة مكنة ${r.tons} طن (${fmt(r.over.cap)} جرام). اختار مكنة أكبر.`; }
+  });
+  state.machines.forEach((m,i) => { const el = document.querySelector(`[data-out="mach-${i}"]`); if (!el) return; const r = machineRate(m);
+    el.innerHTML = `بتسحب حوالي <strong>${fmt1(r.kwhPerHour)}</strong> ك.و.س في الساعة · كهربا <strong>${fmt1(r.elec)}</strong> ج · الساعة كلها <strong>${fmt1(r.total)}</strong> ج`; });
+}
+function fillProfitForm(){
+  const p = cur();
+  $("name").value = p.name || "";
+  KEYS.forEach(k => $(k).value = p[k]);
+  syncCostField();
+}
+function syncCostField(){
+  const p = cur();
+  if (p.useProd) { $("cost").value = Math.round(prodCalc(p).total*10)/10; $("cost").disabled = true; $("costNote").innerHTML = `محسوبة من تكلفة الإنتاج · <a href="#" id="goProd" style="color:var(--brass)">عدّلها</a>`; }
+  else { $("cost").value = p.cost; $("cost").disabled = false; $("costNote").textContent = "تمن السِت (من المصنع أو المورد)"; }
+}
+function renderProfitResult(){
+  const p = cur(); const c = calc(p);
+  $("profit").innerHTML = `${fmt(c.profit)}<span class="cur">جنيه</span>`;
+  $("profit").style.color = c.profit < 0 ? "var(--bad)" : "var(--ink)";
+  const [cls, txt] = status(c); const s = $("status"); s.className = "pill " + cls; s.textContent = txt;
+  $("margin").textContent = pct(c.margin);
+  $("marginN").textContent = `من ${fmt(c.revenue)} جنيه بتتحصل`;
+  $("month").textContent = fmt(c.monthProfit);
+  $("monthN").textContent = `جنيه من حوالي ${fmt(c.delivered)} أوردر بيتسلم`;
+  $("beCpa").textContent = fmt(c.beCpa) + " ج";
+  $("bePrice").textContent = fmt(c.bePrice) + " ج";
+  $("sugK").textContent = `السعر اللي يجيب ربح ${pct(c.target)}`;
+  $("sugPrice").textContent = fmt(c.sugPrice) + " جنيه";
+  const diff = c.sugPrice - num(p.price);
+  $("sugN").textContent = !isFinite(c.sugPrice) ? "النسبة دي عالية أوي مع العمولات دي" :
+    Math.abs(diff) < 1 ? "سعرك الحالي بيحققها بالظبط" :
+    diff > 0 ? `أعلى من سعرك الحالي بـ ${fmt(diff)} جنيه` : `ممكن تنزّل السعر لحد ${fmt(-diff)} جنيه`;
+  const base = Math.max(c.revenue, c.totalCost) || 1;
+  $("bar").innerHTML = barHTML(c.parts, c.profit > 0 ? `<span title="الربح" style="width:${c.profit/base*100}%;background:var(--good)"></span>` : "", base);
+  $("legend").innerHTML = legendHTML(c.parts, c.revenue) +
+    `<div class="tot"><i style="background:${c.profit<0?"var(--bad)":"var(--good)"}"></i><span>${c.profit<0?"خسارة":"الربح"}</span><span>${fmt(c.profit)}</span><span class="pc">${pct(c.margin)}</span></div>` +
+    `<div><i></i><span style="color:var(--muted)">اللي بيتحصل من العميل</span><span style="color:var(--muted)">${fmt(c.revenue)}</span><span class="pc"></span></div>`;
+}
+function renderTable(){
+  $("rows").innerHTML = state.products.map(p => {
+    const c = calc(p); const [cls] = status(c);
+    return `<tr data-id="${p.id}" class="${p.id===state.cur?"cur":""}" style="cursor:pointer">
+      <td>${esc(p.name||"بدون اسم")}</td><td>${fmt(c.cost)}${p.useProd?"":" <span class=\"note\">(يدوي)</span>"}</td><td>${fmt(p.price)}</td><td>${fmt(c.totalCost)}</td>
+      <td style="color:${c.profit<0?"var(--bad)":"inherit"}">${fmt(c.profit)}</td>
+      <td><span class="pill ${cls}">${pct(c.margin)}</span></td><td>${fmt(c.beCpa)}</td><td>${fmt(c.sugPrice)}</td></tr>`;
+  }).join("");
+}
+function refreshNumbers(){ renderProdResult(); syncCostField(); renderProfitResult(); renderTable(); }
+function renderAll(){ renderTabs(); renderView(); renderProdForm(); fillProfitForm(); refreshNumbers(); }
+
+/* ---------- events ---------- */
+$("pform").addEventListener("input", e => {
+  const t = e.target, p = cur(), pr = p.prod;
+  const val = t.type === "number" ? (t.value === "" ? 0 : Number(t.value)) : t.value;
+  const row = t.closest("[data-scope]");
+  if (row) {
+    const i = +row.dataset.i, k = t.dataset.k;
+    if (row.dataset.scope === "part") { pr.parts[i][k] = val; if (k === "name") row.querySelector(".card-h b").textContent = val || "جزء"; }
+    else if (row.dataset.scope === "acc") pr.accs[i][k] = val;
+    else if (row.dataset.scope === "machine") {
+      state.machines[i][k] = val;
+      if (k === "tons") { row.querySelector(".card-h b").textContent = `مكنة ${val} طن`;
+        document.querySelectorAll('select[data-k="machine"]').forEach(s => { const v = s.value; s.innerHTML = machineOptions(v); }); }
+    }
+  } else if (t.dataset.g) state.g[t.dataset.g] = val;
+  else if (t.dataset.k === "name") { p.name = val; renderTabs(); $("name").value = val; }
+  else if (t.dataset.k) pr[t.dataset.k] = val;
+  refreshNumbers(); save();
+});
+$("pform").addEventListener("change", e => { if (e.target.matches("select")) { e.target.dispatchEvent(new Event("input", {bubbles:true})); } });
+$("pform").addEventListener("submit", e => e.preventDefault());
+$("pform").addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const p = cur(), pr = p.prod, i = +b.dataset.i;
+  if (b.dataset.act === "delPart") { if (pr.parts.length > 1) pr.parts.splice(i,1); }
+  if (b.dataset.act === "delAcc") pr.accs.splice(i,1);
+  if (b.dataset.act === "delMachine") {
+    if (state.machines.length < 2) return;
+    const gone = state.machines.splice(i,1)[0];
+    state.products.forEach(q => q.prod && q.prod.parts.forEach(pt => { if (pt.machine === gone.id) pt.machine = state.machines[0].id; }));
+  }
+  save(); renderProdForm(); refreshNumbers();
+});
+$("addPart").addEventListener("click", () => {
+  const pr = cur().prod; const last = pr.parts[pr.parts.length-1] || {};
+  pr.parts.push({name:`جزء ${pr.parts.length+1}`, qty:1, machine:last.machine || state.machines[0].id, weight:300, waste:last.waste ?? 3, mat:last.mat ?? 90, cycle:45, cav:1, mold:0});
+  save(); renderProdForm(); refreshNumbers();
+});
+$("addAcc").addEventListener("click", () => { cur().prod.accs.push({name:"بند جديد", price:0, qty:1}); save(); renderProdForm(); refreshNumbers(); });
+$("addMachine").addEventListener("click", () => { state.machines.push({id:uid("m"), tons:130, motorKw:13, heaterKw:8, drive:"servo", shotG:200, workers:1, extra:30}); save(); renderProdForm(); refreshNumbers(); });
+$("useProd").addEventListener("change", e => { cur().useProd = e.target.checked; save(); refreshNumbers(); });
+
+$("form").addEventListener("input", e => {
+  const p = cur(); const id = e.target.id;
+  if (id === "name") { p.name = e.target.value; renderTabs(); $("pname").value = p.name; }
+  else if (KEYS.includes(id)) p[id] = e.target.value === "" ? 0 : Number(e.target.value);
+  refreshNumbers(); save();
+});
+$("form").addEventListener("submit", e => e.preventDefault());
+$("form").addEventListener("click", e => { if (e.target.id === "goProd") { e.preventDefault(); state.view = "production"; save(); renderView(); window.scrollTo({top:0}); } });
+
+document.querySelector(".seg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; state.view = b.dataset.view; save(); renderView(); });
+$("tabs").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.id === "add") {
+    const src = cur(); const id = uid("p");
+    state.products.push(Object.assign({}, src, {id, name:"منتج جديد", img:null, cost:0, price:0, useProd:true, prod:blankProd()}));
+    state.cur = id; state.view = "production";
+  } else state.cur = b.dataset.id;
+  save(); renderAll();
+  if (b.id === "add") $("pname").select();
+});
+$("rows").addEventListener("click", e => { const tr = e.target.closest("tr"); if (tr) { state.cur = tr.dataset.id; save(); renderAll(); } });
+$("dup").addEventListener("click", () => {
+  const src = cur(); const id = uid("p");
+  state.products.push(Object.assign(structuredClone(src), {id, name: (src.name||"") + " (نسخة)"})); state.cur = id; save(); renderAll();
+});
+function confirmBtn(btn, label, armedLabel, action){
+  let armed = false;
+  btn.addEventListener("click", () => {
+    if (!armed) { armed = true; btn.textContent = armedLabel; setTimeout(() => { armed = false; btn.textContent = label; }, 2500); return; }
+    armed = false; btn.textContent = label; action();
+  });
+}
+confirmBtn($("del"), "حذف المنتج", "دوس تاني للتأكيد", () => {
+  if (state.products.length < 2) return;
+  state.products = state.products.filter(p => p.id !== state.cur); state.cur = state.products[0].id; save(); renderAll();
+});
+confirmBtn($("reset"), "رجّع الأمثلة", "دوس تاني لمسح كل حاجة", () => { state = EXAMPLE_STATE(); save(); renderAll(); });
+renderAll();
+
+/* ---------- file mode (GitHub copy): save/load data and export a report ---------- */
+const FILE_MODE = true;
+if (FILE_MODE) {
+  document.querySelector(".filebar").hidden = false;
+  const stamp = () => new Date().toISOString().slice(0,10);
+  const download = (name, text, type) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], {type}));
+    a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  };
+  const csvCell = v => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+  const r1 = n => isFinite(n) ? Math.round(n*10)/10 : "";
+  const r3 = n => isFinite(n) ? Math.round(n*1000)/1000 : "";
+  function reportRows(){
+    const rows = [["تقرير تكاليف inplace", stamp()], [],
+      ["ملخص المنتجات"],
+      ["المنتج","تكلفة الإنتاج للسِت","سعر البيع","إجمالي التكلفة للأوردر","الربح للأوردر","نسبة الربح %","أقصى صرف إعلانات للأوردر","السعر لنسبة الربح المطلوبة","سِت في الساعة (أبطأ جزء)"]];
+    state.products.forEach(p => { const c = calc(p), pc = prodCalc(p);
+      rows.push([p.name, r1(c.cost), num(p.price), r1(c.totalCost), r1(c.profit), r1(c.margin), r1(c.beCpa), r1(c.sugPrice), r1(pc.setsPerHour)]); });
+    rows.push([], ["تفاصيل تكلفة الإنتاج"],
+      ["المنتج","البند","الخامة","كهربا المكنة","عمالة","صيانة وإهلاك","إكسسوارات وتشطيب","كرتونة وتغليف","الاسطمبة","مصاريف تانية","الإجمالي"]);
+    state.products.forEach(p => { const pc = prodCalc(p); rows.push([p.name, "للسِت", ...pc.parts.map(x => r1(x[1])), r1(pc.total)]); });
+    rows.push([], ["الأجزاء"],
+      ["المنتج","الجزء","العدد في السِت","المكنة (طن)","وزن القطعة (جرام)","سعر الخامة (ج/كيلو)","زمن الدورة (ث)","عدد العيون","قطعة في الساعة","كهربا القطعة (ك.و.س)","خامة القطعة","مكنة القطعة","تكلفة القطعة"]);
+    state.products.forEach(p => { const pc = prodCalc(p);
+      p.prod.parts.forEach((pt,i) => { const r = pc.rows[i]; const m = state.machines.find(x => x.id === pt.machine) || {};
+        rows.push([p.name, pt.name, num(pt.qty), num(m.tons), num(pt.weight), num(pt.mat), num(pt.cycle), num(pt.cav), r1(r.good), r3(r.kwhPiece), r1(r.mat), r1(r.mach), r1(r.piece)]); }); });
+    rows.push([], ["المكن"], ["المكنة (طن)","نوع الطلمبة","الموتور (ك.و)","السخانات (ك.و)","كهربا في الساعة (ك.و.س)","تكلفة الكهربا في الساعة","تكلفة الساعة كلها"]);
+    state.machines.forEach(m => { const r = machineRate(m);
+      rows.push([num(m.tons), m.drive === "fixed" ? "طلمبة ثابتة" : "سيرفو", num(m.motorKw), num(m.heaterKw), r1(r.kwhPerHour), r1(r.elec), r1(r.total)]); });
+    rows.push([], ["سعر الكيلووات ساعة", num(state.g.kwh)], ["مرتب العامل في الشهر", num(state.g.wage)], ["ساعات الشغل في الشهر", num(state.g.hours)]);
+    return rows;
+  }
+  $("exportCsv").addEventListener("click", () => {
+    download(`inplace-cost-report-${stamp()}.csv`, "﻿" + reportRows().map(r => r.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
+  });
+  $("saveJson").addEventListener("click", () => {
+    const copy = Object.assign({}, state, {savedAt: new Date().toISOString()});
+    download("inplace-data.json", JSON.stringify(copy, null, 2), "application/json");
+  });
+  $("loadJson").addEventListener("change", e => {
+    const file = e.target.files[0]; if (!file) return;
+    file.text().then(txt => {
+      const s = JSON.parse(txt);
+      if (!Array.isArray(s.products) || !Array.isArray(s.machines)) throw new Error("bad");
+      state = s; if (!state.products.some(p => p.id === state.cur)) state.cur = state.products[0].id;
+      save(); renderAll();
+    }).catch(() => { const l = document.querySelector('label[for="loadJson"]'); l.textContent = "الملف ده مش ملف بيانات الحاسبة"; setTimeout(() => l.textContent = "فتح ملف بيانات", 3000); });
+    e.target.value = "";
+  });
+
+  /* ----- PDF report: html2pdf when it loads, the browser's print-to-PDF otherwise ----- */
+  const PDF_LIB = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+  let pdfLib = null;
+  const loadPdfLib = () => pdfLib || (pdfLib = new Promise((ok, fail) => {
+    if (window.html2pdf) return ok(window.html2pdf);
+    const s = document.createElement("script"); s.src = PDF_LIB;
+    s.onload = () => window.html2pdf ? ok(window.html2pdf) : fail(new Error("no lib"));
+    s.onerror = () => { pdfLib = null; fail(new Error("offline")); };
+    document.head.appendChild(s);
+  }));
+  const money = n => isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—";
+  const cls = n => n < 0 ? "neg" : "";
+  function reportHTML(){
+    const today = new Date().toLocaleDateString("ar-EG", {dateStyle:"long"});
+    let h = `<div class="rep"><h1><span>inplace</span> · تقرير التكاليف والربح</h1>
+      <p class="meta">${today} · الكيلووات ساعة ${num(state.g.kwh)} ج · مرتب العامل ${money(state.g.wage)} ج / ${num(state.g.hours)} ساعة · كل الأرقام بالجنيه</p>
+      <h2>ملخص المنتجات</h2><table><thead><tr><th>المنتج</th><th>تكلفة الإنتاج للسِت</th><th>سعر البيع</th><th>إجمالي التكلفة للأوردر</th><th>الربح للأوردر</th><th>نسبة الربح</th><th>أقصى صرف إعلانات للأوردر</th><th>السعر لنسبة الربح المطلوبة</th></tr></thead><tbody>`;
+    state.products.forEach(p => { const c = calc(p);
+      h += `<tr><td>${esc(p.name)}</td><td class="n">${money(c.cost)}</td><td class="n">${money(p.price)}</td><td class="n">${money(c.totalCost)}</td>
+        <td class="n ${c.profit<0?"neg":"pos"}">${money(c.profit)}</td><td class="n ${cls(c.margin)}">${pct(c.margin)}</td><td class="n">${money(c.beCpa)}</td><td class="n">${money(c.sugPrice)}</td></tr>`; });
+    h += `</tbody></table><h2>تفاصيل تكلفة إنتاج السِت</h2><table><thead><tr><th>المنتج</th>`;
+    const cats = prodCalc(state.products[0]).parts.map(x => x[0]);
+    cats.forEach(cn => h += `<th>${cn}</th>`); h += `<th>الإجمالي</th><th>سِت في الساعة</th></tr></thead><tbody>`;
+    state.products.forEach(p => { const pc = prodCalc(p);
+      h += `<tr><td>${esc(p.name)}</td>${pc.parts.map(x => `<td class="n">${fmt1(x[1])}</td>`).join("")}<td class="n"><b>${fmt1(pc.total)}</b></td><td class="n">${fmt(pc.setsPerHour)}</td></tr>`; });
+    h += `</tbody></table><div class="pb"></div><h2>الأجزاء</h2><table><thead><tr><th>المنتج</th><th>الجزء</th><th>العدد</th><th>المكنة</th><th>الوزن (جم)</th><th>الخامة (ج/كجم)</th><th>الدورة (ث)</th><th>العيون</th><th>قطعة/ساعة</th><th>كهربا القطعة (ك.و.س)</th><th>خامة القطعة</th><th>مكنة القطعة</th><th>تكلفة القطعة</th></tr></thead><tbody>`;
+    state.products.forEach(p => { const pc = prodCalc(p);
+      p.prod.parts.forEach((pt,i) => { const r = pc.rows[i]; const m = state.machines.find(x => x.id === pt.machine) || {};
+        h += `<tr><td>${esc(p.name)}</td><td>${esc(pt.name)}</td><td class="n">${num(pt.qty)}</td><td class="n">${num(m.tons)} طن</td><td class="n">${num(pt.weight)}</td><td class="n">${num(pt.mat)}</td><td class="n">${num(pt.cycle)}</td><td class="n">${num(pt.cav)}</td><td class="n">${fmt(r.good)}</td><td class="n">${isFinite(r.kwhPiece)?(Math.round(r.kwhPiece*1000)/1000):"—"}</td><td class="n">${fmt1(r.mat)}</td><td class="n">${fmt1(r.mach)}</td><td class="n"><b>${fmt1(r.piece)}</b></td></tr>`; }); });
+    h += `</tbody></table><h2>المكن</h2><table><thead><tr><th>المكنة</th><th>نوع الطلمبة</th><th>الموتور (ك.و)</th><th>السخانات (ك.و)</th><th>كهربا في الساعة (ك.و.س)</th><th>تكلفة الكهربا / ساعة</th><th>عمالة / ساعة</th><th>صيانة وإهلاك / ساعة</th><th>الساعة كلها</th></tr></thead><tbody>`;
+    state.machines.forEach(m => { const r = machineRate(m);
+      h += `<tr><td>${num(m.tons)} طن</td><td>${m.drive === "fixed" ? "طلمبة ثابتة" : "سيرفو"}</td><td class="n">${num(m.motorKw)}</td><td class="n">${num(m.heaterKw)}</td><td class="n">${fmt1(r.kwhPerHour)}</td><td class="n">${fmt1(r.elec)}</td><td class="n">${fmt1(r.labor)}</td><td class="n">${fmt1(r.extra)}</td><td class="n"><b>${fmt1(r.total)}</b></td></tr>`; });
+    h += `</tbody></table><p class="foot">الكهربا محسوبة تقديرياً من قدرة الموتور والسخانات (السيرفو حوالي ٤٠٪ من قدرة الموتور، الطلمبة الثابتة حوالي ٧٥٪، السخانات حوالي ٤٠٪). الضرايب والقيمة المضافة مش محسوبة.</p></div>`;
+    return h;
+  }
+  const pdfOpts = () => ({margin:[8,8,8,8], filename:`inplace-cost-report-${stamp()}.pdf`, image:{type:"jpeg", quality:0.95},
+    html2canvas:{scale:2, backgroundColor:"#ffffff"}, jsPDF:{unit:"mm", format:"a4", orientation:"landscape"}, pagebreak:{mode:["css","legacy"], avoid:"tr"}});
+  async function makePdf(kind){
+    const host = $("reportHost"); host.innerHTML = reportHTML();
+    // html2canvas drops some spaces between Arabic words: give each word its own span so layout keeps the gaps.
+    const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT); const nodes = [];
+    while (walker.nextNode()) if (/\S\s+\S/.test(walker.currentNode.nodeValue)) nodes.push(walker.currentNode);
+    nodes.forEach(n => { const frag = document.createDocumentFragment();
+      n.nodeValue.split(/(\s+)/).forEach(part => { if (!part) return;
+        if (/^\s+$/.test(part)) frag.appendChild(document.createTextNode(" "));
+        else { const s = document.createElement("span"); s.textContent = part; frag.appendChild(s); } });
+      n.parentNode.replaceChild(frag, n); });
+    const lib = await loadPdfLib();
+    const w = lib().set(pdfOpts()).from(host.firstElementChild);
+    return kind === "save" ? w.save() : w.outputPdf("datauristring");
+  }
+  $("exportPdf").addEventListener("click", async () => {
+    const b = $("exportPdf"); b.disabled = true; b.textContent = "بيجهّز الـ PDF…";
+    try { await makePdf("save"); }
+    catch(e) { $("reportHost").innerHTML = reportHTML(); window.print(); }  // offline: choose "Save as PDF" in the print window
+    b.disabled = false; b.textContent = "تصدير PDF";
+  });
+
+  /* ----- GitHub sync: load and save data/inplace-data.json, upload the day's report ----- */
+  const GH = {owner:"bavelly", repo:"inplace-costs", branch:"main", data:"data/inplace-data.json"};
+  const TOKEN_KEY = "inplace-gh-token", SYNC_KEY = "inplace-gh-sync";
+  const ls = { get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+               set(k,v){ try { localStorage.setItem(k,v); } catch(e){} }, del(k){ try { localStorage.removeItem(k); } catch(e){} } };
+  let sync = {}; try { sync = JSON.parse(ls.get(SYNC_KEY)) || {}; } catch(e) {}
+  const putSync = () => ls.set(SYNC_KEY, JSON.stringify(sync));
+  $("ghbar").hidden = false;
+  const status = (msg, cls) => { const s = $("ghStatus"); s.textContent = msg; s.className = "note " + (cls||""); };
+  const b64enc = str => { const bytes = new TextEncoder().encode(str); let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(bin); };
+  const b64dec = b64 => { const bin = atob(b64.replace(/\s/g,"")); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return new TextDecoder().decode(bytes); };
+  const when = iso => new Date(iso).toLocaleString("ar-EG", {dateStyle:"medium", timeStyle:"short"});
+  async function gh(path, opts = {}){
+    const token = ls.get(TOKEN_KEY);
+    const res = await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${path}` + (opts.method ? "" : `?ref=${GH.branch}`), {
+      method: opts.method || "GET",
+      headers: {"Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"},
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    });
+    if (res.status === 404 && !opts.method && opts.allow404) return null;
+    if (!res.ok) { const e = new Error(String(res.status)); e.status = res.status; throw e; }
+    return res.json();
+  }
+  const explain = e => e.status === 401 ? "التوكن غلط أو انتهت صلاحيته. اطلب توكن جديد." :
+    e.status === 403 || e.status === 404 ? "التوكن ده مالوش صلاحية على ريبو inplace-costs (لازم Contents: Read and write)." :
+    e.status === 409 || e.status === 422 ? "حد تاني حفظ أرقام على GitHub بعد آخر تحميل عندك. دوس «اتصل وحمّل آخر أرقام» الأول (تعديلاتك اللي مش محفوظة هتروح)." :
+    "مقدرناش نوصل لـ GitHub. اتأكد من النت وجرّب تاني.";
+  function connectedUI(on){
+    $("ghSave").hidden = !on; $("ghForget").hidden = !on;
+    $("ghToken").closest(".inp").hidden = on; $("ghConnect").textContent = on ? "حمّل آخر أرقام من GitHub" : "اتصل وحمّل آخر أرقام";
+  }
+  async function pull(){
+    status("بيحمّل من GitHub…");
+    try {
+      const f = await gh(GH.data);
+      const s = JSON.parse(b64dec(f.content));
+      if (!Array.isArray(s.products) || !Array.isArray(s.machines)) throw new Error("bad");
+      state = s; if (!state.products.some(p => p.id === state.cur)) state.cur = state.products[0].id;
+      sync = {sha: f.sha, dirty: false, at: new Date().toISOString()}; putSync();
+      save(); renderAll(); connectedUI(true); document.body.classList.remove("locked");
+      status(`اتحمّلت آخر أرقام من GitHub${s.savedAt ? " (متحفظة " + when(s.savedAt) + ")" : ""}.`, "ok");
+    } catch(e) {
+      if (e.message === "bad") status("ملف الأرقام اللي على GitHub مش بالشكل المتوقع.", "err");
+      else { status(explain(e), "err"); if (e.status === 401) { ls.del(TOKEN_KEY); connectedUI(false); } }
+    }
+  }
+  async function push(){
+    const btn = $("ghSave"); btn.disabled = true; status("بيحفظ على GitHub…");
+    const day = stamp();
+    try {
+      state.savedAt = new Date().toISOString();
+      const dataRes = await gh(GH.data, {method:"PUT", body:{
+        message: `تحديث الأرقام ${day}`, branch: GH.branch, sha: sync.sha,
+        content: b64enc(JSON.stringify(state, null, 2))}});
+      sync = {sha: dataRes.content.sha, dirty: false, at: new Date().toISOString()}; putSync(); save();
+      const rpath = `reports/inplace-cost-report-${day}.csv`;
+      const old = await gh(rpath, {allow404:true});
+      await gh(rpath, {method:"PUT", body:{
+        message: `تقرير التكاليف ${day}`, branch: GH.branch, sha: old ? old.sha : undefined,
+        content: b64enc("\ufeff" + reportRows().map(r => r.map(csvCell).join(",")).join("\r\n"))}});
+      let pdfNote = " (Excel و PDF)";
+      try {
+        const uri = await makePdf("uri");
+        const ppath = `reports/inplace-cost-report-${day}.pdf`;
+        const oldPdf = await gh(ppath, {allow404:true});
+        await gh(ppath, {method:"PUT", body:{message:`تقرير التكاليف PDF ${day}`, branch: GH.branch, sha: oldPdf ? oldPdf.sha : undefined, content: uri.split(",")[1]}});
+      } catch(e) { pdfNote = " (Excel بس، الـ PDF ماترفعش)"; }
+      status(`اتحفظت الأرقام واترفع تقرير ${day}${pdfNote} على GitHub · ${when(sync.at)}`, "ok");
+    } catch(e) { status(explain(e), "err"); }
+    btn.disabled = false;
+  }
+  $("ghConnect").addEventListener("click", () => {
+    const typed = $("ghToken").value.trim();
+    if (typed) { ls.set(TOKEN_KEY, typed); $("ghToken").value = ""; }
+    if (!ls.get(TOKEN_KEY)) { status("الصق التوكن الأول.", "err"); return; }
+    if (sync.dirty && !$("ghConnect").dataset.armed) {
+      $("ghConnect").dataset.armed = "1"; status("عندك تعديلات مش محفوظة على GitHub. لو حمّلت هتروح. دوس تاني للتأكيد، أو احفظ الأول.", "warn");
+      setTimeout(() => delete $("ghConnect").dataset.armed, 4000); return;
+    }
+    delete $("ghConnect").dataset.armed; pull();
+  });
+  $("ghSave").addEventListener("click", push);
+  $("ghForget").addEventListener("click", () => {
+    ls.del(TOKEN_KEY); connectedUI(false);
+    if (PUBLIC) { ls.del(STORE); ls.del(SYNC_KEY); sync = {}; state = EXAMPLE_STATE(); renderAll(); document.body.classList.add("locked"); }
+    status("اتفصل. التوكن والأرقام اتمسحوا من المتصفح ده.", "");
+  });
+  const markDirty = e => { if (e.target.closest && e.target.closest("#ghbar")) return; if (ls.get(TOKEN_KEY)) { sync.dirty = true; putSync(); if (!$("ghStatus").classList.contains("warn")) status("فيه تعديلات لسه مش محفوظة على GitHub.", "warn"); } };
+  document.addEventListener("input", markDirty);
+  document.addEventListener("click", e => { if (e.target.closest('[data-act],#addPart,#addAcc,#addMachine,#dup,#del,#reset,#tabs .add,#useProd')) markDirty(e); });
+  if (PUBLIC && !ls.get(TOKEN_KEY)) document.body.classList.add("locked");
+  if (ls.get(TOKEN_KEY)) {
+    connectedUI(true);
+    if (sync.dirty) status("فيه تعديلات لسه مش محفوظة على GitHub.", "warn"); else pull();
+  }
+}
+</script>
+</body>
+</html>
