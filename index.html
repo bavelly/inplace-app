@@ -102,6 +102,7 @@ hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 .chip strong{color:var(--ink)}
 .rowlist{display:flex;flex-direction:column;gap:8px}
 .filebar{display:contents}
+.updbar{display:block;text-align:center;background:var(--brass);color:#fff;font:600 15px var(--body);padding:12px 16px;text-decoration:none}
 #reportHost{position:fixed;left:-20000px;top:0;width:1060px}
 .overlay{position:fixed;inset:0;background:rgba(10,12,15,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
 .overlay[hidden]{display:none !important}
@@ -1099,6 +1100,20 @@ confirmBtn($("del"), "حذف المنتج", "دوس تاني للتأكيد", ()
 });
 confirmBtn($("reset"), "رجّع الأمثلة", "دوس تاني لمسح كل حاجة", () => { state = EXAMPLE_STATE(); save(); renderAll(); });
 renderAll();
+
+/* ---------- newer version check: GitHub Pages lets phones keep an old copy for a while ---------- */
+const APP_VERSION = "1795270868";
+if (/^https?:$/.test(location.protocol)) {
+  fetch(location.pathname + "?check=" + Date.now(), {cache: "no-store"}).then(r => r.ok ? r.text() : "").then(html => {
+    const m = html.match(/const APP_VERSION = "(\d+)"/);
+    if (m && m[1] !== APP_VERSION) {
+      const bar = document.createElement("a");
+      bar.href = location.pathname + "?v=" + m[1]; bar.className = "updbar";
+      bar.textContent = "فيه نسخة أحدث من الحاسبة. دوس هنا علشان تفتحها";
+      document.body.prepend(bar);
+    }
+  }).catch(() => {});
+}
 
 /* ---------- file mode (GitHub copy): save/load data and export a report ---------- */
 const FILE_MODE = true;
