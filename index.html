@@ -186,6 +186,7 @@ details.part[open] > summary .caret::before{content:"▾"}
 .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:6px;vertical-align:middle}
 .rtitle{font:700 15px var(--display);color:var(--brass-ink)}
 .acc:not(.matrow){background:var(--bg);border-radius:10px;padding:8px}
+.acc.sharedacc{background:var(--steel-soft);border:1px solid color-mix(in srgb, var(--steel) 30%, transparent)}
 .mixbox{grid-column:1/-1;gap:6px}
 .dyechk{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:14px;background:var(--surface)}
 .dyechk:has(input:checked){border-color:#c2378a;background:color-mix(in srgb, #c2378a 10%, var(--surface))}
@@ -592,6 +593,24 @@ function normalizeMaterials(st){
   }));
   return st;
 }
+/* Shared accessory lines: same item and one price for every product (each product keeps its own count). */
+const SHARED_ACC = {id:"sticker_bag", name:"ستيكر وورقة وكيس"};
+const sharedById = id => (state.sharedAccs || []).find(s => s.id === id);
+const accPrice = a => a.sid ? num((sharedById(a.sid) || {}).price) : num(a.price);
+const accName = a => a.sid ? (sharedById(a.sid) || {name:"؟"}).name : a.name;
+function normalizeShared(st){
+  if (!Array.isArray(st.sharedAccs)) {
+    // First run: the old one-product sticker line becomes the shared line and lends it its price.
+    let price = 0;
+    (st.products || []).forEach(p => { if (!p.prod) return;
+      p.prod.accs = (p.prod.accs || []).filter(a => { const old = !a.sid && /^\s*(ا?ستيكر)/.test(a.name || "");
+        if (old && !price) price = num(a.price); return !old; }); });
+    st.sharedAccs = [{...SHARED_ACC, price}];
+  }
+  (st.products || []).forEach(p => { if (!p.prod) return; p.prod.accs = p.prod.accs || [];
+    st.sharedAccs.forEach(s => { if (!p.prod.accs.some(a => a.sid === s.id)) p.prod.accs.unshift({sid: s.id, qty: 1}); }); });
+  return st;
+}
 function normalizeMachines(st){
   (st.machines || []).forEach(m => {
     if (!m.brand) m.brand = ["h108","h170","h268"].includes(m.id) ? "hwamda" : "other";
@@ -645,11 +664,11 @@ if (state.seed < 3) {
   }));
   state.seed = 3;
 }
-normalizeMachines(state); normalizeMaterials(state);
+normalizeMachines(state); normalizeMaterials(state); normalizeShared(state);
 const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch(e) {} };
 const cur = () => state.products.find(p => p.id === state.cur) || state.products[0];
 const uid = p => p + Date.now().toString(36) + Math.floor(Math.random()*1e4);
-const blankProd = () => ({parts:[{name:"جزء ١", qty:1, machine:bestMachine(state.machines, 309), weight:300, waste:3, mat:90, mix:[{m:"ps_clear", pct:100}], cycle:45, cav:1, mold:0}], accs:[], carton:0, perCarton:1, inner:0, master:0, perMaster:1, scrap:3, amort:0, otherSet:0});
+const blankProd = () => ({parts:[{name:"جزء ١", qty:1, machine:bestMachine(state.machines, 309), weight:300, waste:3, mat:90, mix:[{m:"ps_clear", pct:100}], cycle:45, cav:1, mold:0}], accs:(state.sharedAccs || []).map(s => ({sid: s.id, qty: 1})), carton:0, perCarton:1, inner:0, master:0, perMaster:1, scrap:3, amort:0, otherSet:0});
 
 const fmt = n => isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—";
 const fmt1 = n => !isFinite(n) ? "—" : Math.abs(n) < 100 ? (Math.round(n*10)/10).toLocaleString("en-US") : fmt(n);
@@ -691,7 +710,7 @@ function prodCalc(p){
     return {name: pt.name, mat, mach, piece: mat + mach, good, tons: m.tons, kwhPiece: good ? rate.kwhPerHour/good : NaN,
       over: num(m.shotG) && shot > num(m.shotG) ? {shot, cap: num(m.shotG)} : null};
   });
-  const accs = pr.accs.reduce((s,a) => s + num(a.price)*num(a.qty), 0);
+  const accs = pr.accs.reduce((s,a) => s + accPrice(a)*num(a.qty), 0);
   const pack = num(pr.carton) / Math.max(1, num(pr.perCarton)) + num(pr.inner) + num(pr.master) / Math.max(1, num(pr.perMaster)) / Math.max(1, num(pr.perCarton));
   const mold = num(pr.amort) ? moldTotal / num(pr.amort) : 0;
   const other = num(pr.otherSet);
@@ -820,7 +839,13 @@ function renderProdForm(){
     </details>`).join("");
   $("parts").querySelectorAll("details.part").forEach(d => d.addEventListener("toggle", () => {
     const i = +d.dataset.i; d.open ? openParts.add(i) : openParts.delete(i); }));
-  $("accs").innerHTML = pr.accs.length ? pr.accs.map((a,i) => `
+  $("accs").innerHTML = pr.accs.length ? pr.accs.map((a,i) => a.sid ? `
+    <div class="acc sharedacc" data-scope="acc" data-i="${i}">
+      <div class="f"><label>البند <span class="tagall">لكل المنتجات</span></label><div class="inp"><input type="text" data-k="name" value="${esc(accName(a))}"></div></div>
+      ${F("السعر", `type="number" min="0" step="any" data-k="price" value="${accPrice(a)}"`, "جنيه", "بيتغيّر في كل المنتجات")}
+      ${F("العدد في السِت", `type="number" min="0" step="any" data-k="qty" value="${a.qty}"`, "", "0 لو المنتج ده مالوش")}
+      <span></span>
+    </div>` : `
     <div class="acc" data-scope="acc" data-i="${i}">
       ${F("البند", `type="text" data-k="name" value="${esc(a.name)}"`)}
       ${F("السعر", `type="number" min="0" step="any" data-k="price" value="${a.price}"`, "جنيه")}
@@ -954,7 +979,8 @@ const onFormInput = e => {
       else { pr.parts[i][k] = val; if (k === "name") row.querySelector(".pname").textContent = val || "جزء"; } }
     else if (row.dataset.scope === "mat") { state.materials[i][k] = val;
       if (k === "name") document.querySelectorAll('select[data-mk="m"]').forEach(s => { const o = s.querySelector(`option[value="${state.materials[i].id}"]`); if (o) o.textContent = val; }); }
-    else if (row.dataset.scope === "acc") pr.accs[i][k] = val;
+    else if (row.dataset.scope === "acc") { const a = pr.accs[i];
+      if (a.sid && (k === "price" || k === "name")) sharedById(a.sid)[k] = val; else a[k] = val; }
     else if (row.dataset.scope === "machine") {
       const m = state.machines[i]; m[k] = val;
       if (k === "brand" || k === "tons") {
@@ -1120,7 +1146,7 @@ if (FILE_MODE) {
     file.text().then(txt => {
       const s = JSON.parse(txt);
       if (!Array.isArray(s.products) || !Array.isArray(s.machines)) throw new Error("bad");
-      state = normalizeMaterials(normalizeMachines(s)); if (!state.products.some(p => p.id === state.cur)) state.cur = state.products[0].id;
+      state = normalizeShared(normalizeMaterials(normalizeMachines(s))); if (!state.products.some(p => p.id === state.cur)) state.cur = state.products[0].id;
       save(); renderAll();
     }).catch(() => { const l = document.querySelector('label[for="loadJson"]'); l.textContent = "الملف ده مش ملف بيانات الحاسبة"; setTimeout(() => l.textContent = "فتح ملف بيانات", 3000); });
     e.target.value = "";
@@ -1257,7 +1283,7 @@ if (FILE_MODE) {
       const f = await gh(GH.data);
       const s = JSON.parse(b64dec(f.content));
       if (!Array.isArray(s.products) || !Array.isArray(s.machines)) throw new Error("bad");
-      state = normalizeMaterials(normalizeMachines(s)); if (!state.products.some(p => p.id === state.cur)) state.cur = state.products[0].id;
+      state = normalizeShared(normalizeMaterials(normalizeMachines(s))); if (!state.products.some(p => p.id === state.cur)) state.cur = state.products[0].id;
       sync = {sha: f.sha, dirty: false, at: new Date().toISOString()}; putSync();
       save(); renderAll(); connectedUI(true); document.body.classList.remove("locked");
       status(`اتحمّلت آخر أرقام من GitHub${s.savedAt ? " (متحفظة " + when(s.savedAt) + ")" : ""}.`, "ok");
