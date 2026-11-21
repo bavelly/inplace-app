@@ -141,6 +141,11 @@ body.locked #lockNote{display:block}
 .autoline b{font-weight:700}
 .autoline span{color:var(--muted);font-size:12.5px}
 .linkbtn{border:0;background:none;padding:0;color:var(--brass);font:inherit;text-decoration:underline;cursor:pointer}
+.mixbox{grid-column:1/-1;gap:6px}
+.acc.matrow{grid-template-columns:minmax(0,1fr) 130px auto}
+@media (max-width:520px){.acc.matrow{grid-template-columns:minmax(0,1fr) 112px auto}.acc.matrow .f:first-child{grid-column:auto}}
+.mixrow{display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:8px;align-items:center}
+.mixbox small b{color:var(--ink)}
 .warnline{margin:0;font-size:13px;color:var(--warn);background:var(--warn-bg);border-radius:8px;padding:6px 10px}
 .acc{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:end}
 @media (max-width:520px){.acc{grid-template-columns:1fr 1fr}.acc .f:first-child{grid-column:1/-1}}
@@ -279,6 +284,12 @@ td .pill{font-size:11.5px}
       </fieldset>
       <hr>
       <fieldset>
+        <legend>الخامات وأسعارها <small>مشتركة بين كل المنتجات · سعر الكيلو</small></legend>
+        <div class="rowlist" id="mats"></div>
+        <button type="button" class="btn ghost" id="addMat">+ خامة جديدة</button>
+      </fieldset>
+      <hr>
+      <fieldset>
         <legend>المكن <small>Haitian · Sonly · Hwamda · مشتركة بين كل المنتجات</small></legend>
         <p class="note">الكهربا محسوبة من قدرة الموتور والسخانات اللي على لوحة المكنة: السيرفو بيسحب في المتوسط حوالي ٤٠٪ من قدرة الموتور، والطلمبة الثابتة حوالي ٧٥٪، والسخانات حوالي ٤٠٪ بعد ما الماكينة تسخن. كهربا القطعة = كهربا الساعة ÷ عدد القطع في الساعة، فكل ما زمن الدورة يقل كهربا القطعة بتقل.</p>
         <div class="fields">
@@ -311,6 +322,11 @@ td .pill{font-size:11.5px}
       <div style="display:flex;flex-direction:column;gap:6px">
         <h2>تكلفة كل جزء</h2>
         <table class="mini"><thead><tr><th>الجزء</th><th>خامة</th><th>مكنة</th><th>القطعة</th><th>قطعة/ساعة</th></tr></thead><tbody id="partRows"></tbody></table>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <h2>الخامة اللي بيسحبها السِت</h2>
+        <table class="mini"><thead><tr><th>الخامة</th><th>الكمية</th><th>التكلفة</th></tr></thead><tbody id="matUse"></tbody></table>
+        <p class="note">شاملة هالك المصبات والقطع المرفوضة. اضربها في عدد الأطقم علشان تعرف تشتري كام.</p>
       </div>
       <label class="link"><input type="checkbox" id="useProd"><span>استخدم تكلفة الإنتاج دي كتكلفة المنتج في حساب الربح</span></label>
     </aside>
@@ -451,6 +467,35 @@ function catalogSpec(brand, tons){
 function fillFromCatalog(m){ const s = catalogSpec(m.brand, m.tons); if (s) Object.assign(m, s); return m; }
 const autoLine = m => `الموتور <b>${num(m.motorKw)}</b> ك.و · السخانات <b>${num(m.heaterKw)}</b> ك.و · أقصى حقنة <b>${fmt(num(m.shotG))}</b> جم <span>(${esc(m.src || "")})</span>`;
 const machineLabel = m => `${m.brand && m.brand !== "other" ? BRANDS[m.brand] + " " : ""}${num(m.tons)} طن`;
+/* Materials: shared list with a price per kg; each part uses a blend of them by percent. */
+const MATERIALS = () => [
+  {id:"pp", name:"بولي بروبلين (PP)", price:0}, {id:"pet", name:"PET", price:0},
+  {id:"ps_clear", name:"مخرز شفاف", price:90}, {id:"ps_cafe", name:"مخرز كافيه", price:0}, {id:"ps_color", name:"مخرز ألوان", price:0}
+];
+const matById = id => (state.materials || []).find(x => x.id === id);
+function matPrice(pt){
+  const mix = pt.mix || [];
+  if (!mix.length) return num(pt.mat);                       // older parts: one price typed by hand
+  const tot = mix.reduce((s,x) => s + num(x.pct), 0); if (!tot) return 0;
+  return mix.reduce((s,x) => s + num(x.pct) / tot * num((matById(x.m) || {}).price), 0);
+}
+const mixTotal = pt => (pt.mix || []).reduce((s,x) => s + num(x.pct), 0);
+const mixShort = pt => (pt.mix || []).length ? pt.mix.map(x => `${(matById(x.m) || {name:"؟"}).name} ${num(x.pct)}%`).join(" + ") : "سعر يدوي";
+function normalizeMaterials(st){
+  if (!Array.isArray(st.materials)) {
+    st.materials = MATERIALS();
+    const counts = {}; (st.products || []).forEach(p => (p.prod ? p.prod.parts : []).forEach(pt => { if (!pt.mix) counts[num(pt.mat)] = (counts[num(pt.mat)] || 0) + 1; }));
+    const mode = Object.keys(counts).sort((a,b) => counts[b] - counts[a])[0];
+    if (mode && +mode > 0) st.materials.find(x => x.id === "ps_clear").price = +mode;
+  }
+  const clear = st.materials.find(x => x.id === "ps_clear");
+  (st.products || []).forEach(p => (p.prod ? p.prod.parts : []).forEach(pt => {
+    if (pt.mix) return;
+    // Same price as the clear PS default: becomes 100% clear PS. Any other hand-typed price stays as it was.
+    pt.mix = clear && num(pt.mat) === num(clear.price) ? [{m:"ps_clear", pct:100}] : [];
+  }));
+  return st;
+}
 function normalizeMachines(st){
   (st.machines || []).forEach(m => {
     if (!m.brand) m.brand = ["h108","h170","h268"].includes(m.id) ? "hwamda" : "other";
@@ -504,11 +549,11 @@ if (state.seed < 3) {
   }));
   state.seed = 3;
 }
-normalizeMachines(state);
+normalizeMachines(state); normalizeMaterials(state);
 const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch(e) {} };
 const cur = () => state.products.find(p => p.id === state.cur) || state.products[0];
 const uid = p => p + Date.now().toString(36) + Math.floor(Math.random()*1e4);
-const blankProd = () => ({parts:[{name:"جزء ١", qty:1, machine:bestMachine(state.machines, 309), weight:300, waste:3, mat:90, cycle:45, cav:1, mold:0}], accs:[], carton:0, perCarton:1, inner:0, scrap:3, amort:0, otherSet:0});
+const blankProd = () => ({parts:[{name:"جزء ١", qty:1, machine:bestMachine(state.machines, 309), weight:300, waste:3, mat:90, mix:[{m:"ps_clear", pct:100}], cycle:45, cav:1, mold:0}], accs:[], carton:0, perCarton:1, inner:0, scrap:3, amort:0, otherSet:0});
 
 const fmt = n => isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—";
 const fmt1 = n => !isFinite(n) ? "—" : Math.abs(n) < 100 ? (Math.round(n*10)/10).toLocaleString("en-US") : fmt(n);
@@ -527,16 +572,20 @@ function machineRate(m){
 function prodCalc(p){
   const pr = p.prod || blankProd();
   const scrap = Math.min(num(pr.scrap), 90) / 100;
-  let material = 0, elec = 0, labor = 0, extra = 0, moldTotal = 0, setsPerHour = Infinity;
+  let material = 0, elec = 0, labor = 0, extra = 0, moldTotal = 0, setsPerHour = Infinity; const kgBy = {};
   const rows = pr.parts.map(pt => {
     const m = state.machines.find(x => x.id === pt.machine) || state.machines[0];
     const rate = machineRate(m);
     const perHour = num(pt.cycle) ? 3600 / num(pt.cycle) * Math.max(1, num(pt.cav)) : 0;
     const good = perHour * (1 - scrap);
-    const mat = num(pt.weight)/1000 * (1 + num(pt.waste)/100) * num(pt.mat) / (1 - scrap);
+    const kgPiece = num(pt.weight)/1000 * (1 + num(pt.waste)/100) / (1 - scrap);
+    const mat = kgPiece * matPrice(pt);
     const mach = good ? rate.total / good : NaN;
     const q = num(pt.qty);
     material += mat * q;
+    const tot = mixTotal(pt);
+    if (tot) pt.mix.forEach(x => { kgBy[x.m] = (kgBy[x.m] || 0) + kgPiece * q * num(x.pct) / tot; });
+    else kgBy._manual = (kgBy._manual || 0) + kgPiece * q;
     if (good) { elec += rate.elec/good*q; labor += rate.labor/good*q; extra += rate.extra/good*q; }
     moldTotal += num(pt.mold);
     if (q && good) setsPerHour = Math.min(setsPerHour, good / q);
@@ -549,7 +598,7 @@ function prodCalc(p){
   const mold = num(pr.amort) ? moldTotal / num(pr.amort) : 0;
   const other = num(pr.otherSet);
   const total = material + elec + labor + extra + accs + pack + mold + other;
-  return {rows, total, setsPerHour: isFinite(setsPerHour) ? setsPerHour : 0, moldTotal,
+  return {rows, total, kgBy, setsPerHour: isFinite(setsPerHour) ? setsPerHour : 0, moldTotal,
     parts:[["الخامة",material,"--seg1"],["كهربا المكنة",elec,"--seg3"],["عمالة",labor,"--seg2"],["صيانة وإهلاك",extra,"--seg7"],
            ["إكسسوارات وتشطيب",accs,"--seg8"],["كرتونة وتغليف",pack,"--seg4"],["الاسطمبة",mold,"--seg6"],["مصاريف تانية",other,"--seg5"]]};
 }
@@ -623,7 +672,14 @@ function renderProdForm(){
         ${F("العدد في السِت", `type="number" min="0" step="1" data-k="qty" value="${pt.qty}"`, "قطعة")}
         <div class="f"><label>المكنة</label><div class="inp"><select data-k="machine">${machineOptions(pt.machine)}</select></div></div>
         ${F("وزن القطعة", `type="number" min="0" step="any" data-k="weight" value="${pt.weight}"`, "جرام", "على الميزان بعد الحقن")}
-        ${F("سعر الخامة", `type="number" min="0" step="any" data-k="mat" value="${pt.mat}"`, "جنيه / كيلو")}
+        <div class="f mixbox"><label>الخامة</label>
+          ${(pt.mix || []).length ? pt.mix.map((x,j) => `<div class="mixrow" data-j="${j}">
+              <div class="inp"><select data-mk="m">${state.materials.map(mt => `<option value="${mt.id}" ${mt.id===x.m?"selected":""}>${esc(mt.name)}</option>`).join("")}</select></div>
+              <div class="inp pct"><input type="number" min="0" max="100" step="any" data-mk="pct" value="${x.pct}"><span class="u">%</span></div>
+              <button type="button" class="btn small" data-act="delMix" data-i="${i}" data-j="${j}" aria-label="شيل الخامة">×</button></div>`).join("")
+            : `<div class="inp"><input type="number" min="0" step="any" data-k="mat" value="${pt.mat}"><span class="u">جنيه / كيلو (سعر يدوي)</span></div>`}
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn small" data-act="addMix" data-i="${i}">+ ${(pt.mix || []).length ? "خامة تانية في الخلطة" : "اختار الخامة بدل السعر اليدوي"}</button>
+          <small data-mixout="part-${i}"></small></div></div>
         ${F("هالك المصبات", `type="number" min="0" step="any" data-k="waste" value="${pt.waste}"`, "%", "رنر ومصبات مش بترجع")}
         ${F("زمن الدورة", `type="number" min="0" step="any" data-k="cycle" value="${pt.cycle}"`, "ثانية", "من قفل الاسطمبة للقفلة اللي بعدها")}
         ${F("عدد العيون", `type="number" min="1" step="1" data-k="cav" value="${pt.cav}"`, "عين", "قطع في الحقنة الواحدة")}
@@ -638,6 +694,12 @@ function renderProdForm(){
       ${F("العدد في السِت", `type="number" min="0" step="any" data-k="qty" value="${a.qty}"`)}
       <button type="button" class="btn small" data-act="delAcc" data-i="${i}" style="margin-bottom:6px">حذف</button>
     </div>`).join("") : `<p class="note">مفيش إكسسوارات لسه.</p>`;
+  $("mats").innerHTML = state.materials.map((mt,i) => `
+    <div class="acc matrow" data-scope="mat" data-i="${i}">
+      ${F("الخامة", `type="text" data-k="name" value="${esc(mt.name)}"`)}
+      ${F("سعر الكيلو", `type="number" min="0" step="any" data-k="price" value="${mt.price}"`, "جنيه")}
+      <button type="button" class="btn small" data-act="delMat" data-i="${i}" style="margin-bottom:6px">حذف</button>
+    </div>`).join("");
   $("machines").innerHTML = state.machines.map((m,i) => `
     <div class="card" data-scope="machine" data-i="${i}">
       <div class="card-h"><b>${esc(machineLabel(m))}</b><span class="chip" data-out="mach-${i}"></span>
@@ -668,6 +730,18 @@ function renderProdResult(){
   $("pbar").innerHTML = barHTML(c.parts, "", c.total);
   $("plegend").innerHTML = legendHTML(c.parts, c.total) + `<div class="tot"><i style="background:var(--ink)"></i><span>إجمالي السِت</span><span>${fmt1(c.total)}</span><span class="pc">100%</span></div>`;
   $("partRows").innerHTML = c.rows.map(r => `<tr><td>${esc(r.name)}</td><td>${fmt1(r.mat)}</td><td>${fmt1(r.mach)}</td><td><b>${fmt1(r.piece)}</b></td><td>${fmt(r.good)}</td></tr>`).join("");
+  cur().prod.parts.forEach((pt,i) => {
+    const el = document.querySelector(`[data-mixout="part-${i}"]`); if (!el) return;
+    if (!(pt.mix || []).length) { el.textContent = ""; return; }
+    const tot = mixTotal(pt);
+    const grams = pt.mix.map(x => `${fmt(tot ? num(x.pct) / tot * 1000 : 0)} جم ${(matById(x.m) || {name:"؟"}).name}`).join(" + ");
+    const zero = pt.mix.filter(x => !num((matById(x.m) || {}).price)).map(x => (matById(x.m) || {name:"؟"}).name);
+    el.innerHTML = `كيلو الخلطة بـ <b>${fmt1(matPrice(pt))}</b> ج · في كل كيلو: ${grams}`
+      + (Math.abs(tot - 100) > 0.01 ? ` <span style="color:var(--warn)">· مجموع النسب ${fmt1(tot)}% مش 100%</span>` : "")
+      + (zero.length ? ` <span style="color:var(--warn)">· اكتب سعر ${zero.join(" و")} تحت في «الخامات وأسعارها»</span>` : "");
+  });
+  $("matUse").innerHTML = Object.entries(c.kgBy).filter(([,kg]) => kg > 0).map(([id,kg]) => { const mt = matById(id);
+    return `<tr><td>${id === "_manual" ? "خامة بسعر يدوي" : esc(mt ? mt.name : "؟")}</td><td>${(Math.round(kg*1000)/1000).toLocaleString("en-US")} كجم</td><td>${mt ? fmt1(kg * num(mt.price)) + " ج" : "—"}</td></tr>`; }).join("");
   c.rows.forEach((r,i) => {
     const el = document.querySelector(`[data-out="part-${i}"]`);
     if (el) el.innerHTML = `القطعة <strong>${fmt1(r.piece)}</strong> جنيه · ${fmt(r.good)} قطعة/ساعة · كهربا ${(Math.round(r.kwhPiece*1000)/1000).toLocaleString("en-US")} ك.و.س`;
@@ -730,7 +804,12 @@ $("pform").addEventListener("input", e => {
   const row = t.closest("[data-scope]");
   if (row) {
     const i = +row.dataset.i, k = t.dataset.k;
-    if (row.dataset.scope === "part") { pr.parts[i][k] = val; if (k === "name") row.querySelector(".card-h b").textContent = val || "جزء"; }
+    if (row.dataset.scope === "part") {
+      const mr = t.closest(".mixrow");
+      if (mr && t.dataset.mk) pr.parts[i].mix[+mr.dataset.j][t.dataset.mk] = t.dataset.mk === "pct" ? val : t.value;
+      else { pr.parts[i][k] = val; if (k === "name") row.querySelector(".card-h b").textContent = val || "جزء"; } }
+    else if (row.dataset.scope === "mat") { state.materials[i][k] = val;
+      if (k === "name") document.querySelectorAll('select[data-mk="m"]').forEach(s => { const o = s.querySelector(`option[value="${state.materials[i].id}"]`); if (o) o.textContent = val; }); }
     else if (row.dataset.scope === "acc") pr.accs[i][k] = val;
     else if (row.dataset.scope === "machine") {
       const m = state.machines[i]; m[k] = val;
@@ -751,6 +830,16 @@ $("pform").addEventListener("click", e => {
   const p = cur(), pr = p.prod, i = +b.dataset.i;
   if (b.dataset.act === "delPart") { if (pr.parts.length > 1) pr.parts.splice(i,1); }
   if (b.dataset.act === "delAcc") pr.accs.splice(i,1);
+  if (b.dataset.act === "addMix") { const pt = pr.parts[i]; pt.mix = pt.mix || [];
+    if (!pt.mix.length) pt.mix.push({m: "ps_clear", pct: 100});
+    else { const left = Math.max(0, 100 - mixTotal(pt)); const used = new Set(pt.mix.map(x => x.m));
+      pt.mix.push({m: (state.materials.find(x => !used.has(x.id)) || state.materials[0]).id, pct: left}); } }
+  if (b.dataset.act === "delMix") pr.parts[i].mix.splice(+b.dataset.j, 1);
+  if (b.dataset.act === "delMat") {
+    const id = state.materials[i].id;
+    if (state.products.some(q => q.prod && q.prod.parts.some(pt => (pt.mix || []).some(x => x.m === id)))) { b.textContent = "مستخدمة في منتج"; setTimeout(() => b.textContent = "حذف", 2000); return; }
+    state.materials.splice(i, 1);
+  }
   if (b.dataset.act === "manualMachine") state.machines[i].auto = false;
   if (b.dataset.act === "autoMachine") { state.machines[i].auto = true; fillFromCatalog(state.machines[i]); }
   if (b.dataset.act === "delMachine") {
@@ -762,9 +851,11 @@ $("pform").addEventListener("click", e => {
 });
 $("addPart").addEventListener("click", () => {
   const pr = cur().prod; const last = pr.parts[pr.parts.length-1] || {};
-  pr.parts.push({name:`جزء ${pr.parts.length+1}`, qty:1, machine:last.machine || state.machines[0].id, weight:300, waste:last.waste ?? 3, mat:last.mat ?? 90, cycle:45, cav:1, mold:0});
+  pr.parts.push({name:`جزء ${pr.parts.length+1}`, qty:1, machine:last.machine || state.machines[0].id, weight:300, waste:last.waste ?? 3, mat:last.mat ?? 90,
+    mix: last.mix && last.mix.length ? last.mix.map(x => ({...x})) : [{m:"ps_clear", pct:100}], cycle:45, cav:1, mold:0});
   save(); renderProdForm(); refreshNumbers();
 });
+$("addMat").addEventListener("click", () => { state.materials.push({id: uid("mt"), name: "خامة جديدة", price: 0}); save(); renderProdForm(); refreshNumbers(); });
 $("addAcc").addEventListener("click", () => { cur().prod.accs.push({name:"بند جديد", price:0, qty:1}); save(); renderProdForm(); refreshNumbers(); });
 const newMachine = (brand, tons) => fillFromCatalog({id:uid("m"), brand, tons, auto:true, drive:"servo", workers:1, extra: Math.round(10 + num(tons) * 0.15), src:""});
 $("addMachine").addEventListener("click", () => { state.machines.push(newMachine("haitian", 250)); save(); renderProdForm(); refreshNumbers(); });
@@ -852,10 +943,10 @@ if (FILE_MODE) {
       ["المنتج","البند","الخامة","كهربا المكنة","عمالة","صيانة وإهلاك","إكسسوارات وتشطيب","كرتونة وتغليف","الاسطمبة","مصاريف تانية","الإجمالي"]);
     state.products.forEach(p => { const pc = prodCalc(p); rows.push([p.name, "للسِت", ...pc.parts.map(x => r1(x[1])), r1(pc.total)]); });
     rows.push([], ["الأجزاء"],
-      ["المنتج","الجزء","العدد في السِت","المكنة","وزن القطعة (جرام)","سعر الخامة (ج/كيلو)","زمن الدورة (ث)","عدد العيون","قطعة في الساعة","كهربا القطعة (ك.و.س)","خامة القطعة","مكنة القطعة","تكلفة القطعة"]);
+      ["المنتج","الجزء","العدد في السِت","المكنة","وزن القطعة (جرام)","الخامة","سعر كيلو الخامة","زمن الدورة (ث)","عدد العيون","قطعة في الساعة","كهربا القطعة (ك.و.س)","خامة القطعة","مكنة القطعة","تكلفة القطعة"]);
     state.products.forEach(p => { const pc = prodCalc(p);
       p.prod.parts.forEach((pt,i) => { const r = pc.rows[i]; const m = state.machines.find(x => x.id === pt.machine) || {};
-        rows.push([p.name, pt.name, num(pt.qty), machineLabel(m), num(pt.weight), num(pt.mat), num(pt.cycle), num(pt.cav), r1(r.good), r3(r.kwhPiece), r1(r.mat), r1(r.mach), r1(r.piece)]); }); });
+        rows.push([p.name, pt.name, num(pt.qty), machineLabel(m), num(pt.weight), mixShort(pt), r1(matPrice(pt)), num(pt.cycle), num(pt.cav), r1(r.good), r3(r.kwhPiece), r1(r.mat), r1(r.mach), r1(r.piece)]); }); });
     rows.push([], ["المكن"], ["المكنة","نوع الطلمبة","الموتور (ك.و)","السخانات (ك.و)","كهربا في الساعة (ك.و.س)","تكلفة الكهربا في الساعة","تكلفة الساعة كلها"]);
     state.machines.forEach(m => { const r = machineRate(m);
       rows.push([machineLabel(m), m.drive === "fixed" ? "طلمبة ثابتة" : "سيرفو", num(m.motorKw), num(m.heaterKw), r1(r.kwhPerHour), r1(r.elec), r1(r.total)]); });
@@ -874,7 +965,7 @@ if (FILE_MODE) {
     file.text().then(txt => {
       const s = JSON.parse(txt);
       if (!Array.isArray(s.products) || !Array.isArray(s.machines)) throw new Error("bad");
-      state = normalizeMachines(s); if (!state.products.some(p => p.id === state.cur)) state.cur = state.products[0].id;
+      state = normalizeMaterials(normalizeMachines(s)); if (!state.products.some(p => p.id === state.cur)) state.cur = state.products[0].id;
       save(); renderAll();
     }).catch(() => { const l = document.querySelector('label[for="loadJson"]'); l.textContent = "الملف ده مش ملف بيانات الحاسبة"; setTimeout(() => l.textContent = "فتح ملف بيانات", 3000); });
     e.target.value = "";
@@ -917,7 +1008,7 @@ if (FILE_MODE) {
     if (sec.parts) { h += `${started ? '<div class="pb"></div>' : ""}<h2>الأجزاء</h2><table><thead><tr><th>المنتج</th><th>الجزء</th><th>العدد</th><th>المكنة</th><th>الوزن (جم)</th><th>الخامة (ج/كجم)</th><th>الدورة (ث)</th><th>العيون</th><th>قطعة/ساعة</th><th>كهربا القطعة (ك.و.س)</th><th>خامة القطعة</th><th>مكنة القطعة</th><th>تكلفة القطعة</th></tr></thead><tbody>`;
     prods.forEach(p => { const pc = prodCalc(p);
       p.prod.parts.forEach((pt,i) => { const r = pc.rows[i]; const m = state.machines.find(x => x.id === pt.machine) || {};
-        h += `<tr><td>${esc(p.name)}</td><td>${esc(pt.name)}</td><td class="n">${num(pt.qty)}</td><td>${esc(machineLabel(m))}</td><td class="n">${num(pt.weight)}</td><td class="n">${num(pt.mat)}</td><td class="n">${num(pt.cycle)}</td><td class="n">${num(pt.cav)}</td><td class="n">${fmt(r.good)}</td><td class="n">${isFinite(r.kwhPiece)?(Math.round(r.kwhPiece*1000)/1000):"—"}</td><td class="n">${fmt1(r.mat)}</td><td class="n">${fmt1(r.mach)}</td><td class="n"><b>${fmt1(r.piece)}</b></td></tr>`; }); });
+        h += `<tr><td>${esc(p.name)}</td><td>${esc(pt.name)}</td><td class="n">${num(pt.qty)}</td><td>${esc(machineLabel(m))}</td><td class="n">${num(pt.weight)}</td><td style="white-space:normal">${esc(mixShort(pt))} · <b>${fmt1(matPrice(pt))}</b></td><td class="n">${num(pt.cycle)}</td><td class="n">${num(pt.cav)}</td><td class="n">${fmt(r.good)}</td><td class="n">${isFinite(r.kwhPiece)?(Math.round(r.kwhPiece*1000)/1000):"—"}</td><td class="n">${fmt1(r.mat)}</td><td class="n">${fmt1(r.mach)}</td><td class="n"><b>${fmt1(r.piece)}</b></td></tr>`; }); });
     h += `</tbody></table>`; }
     if (sec.machines && machs.length) { h += `<h2>المكن</h2><table><thead><tr><th>المكنة</th><th>نوع الطلمبة</th><th>الموتور (ك.و)</th><th>السخانات (ك.و)</th><th>كهربا في الساعة (ك.و.س)</th><th>تكلفة الكهربا / ساعة</th><th>عمالة / ساعة</th><th>صيانة وإهلاك / ساعة</th><th>الساعة كلها</th></tr></thead><tbody>`;
     machs.forEach(m => { const r = machineRate(m);
@@ -1011,7 +1102,7 @@ if (FILE_MODE) {
       const f = await gh(GH.data);
       const s = JSON.parse(b64dec(f.content));
       if (!Array.isArray(s.products) || !Array.isArray(s.machines)) throw new Error("bad");
-      state = normalizeMachines(s); if (!state.products.some(p => p.id === state.cur)) state.cur = state.products[0].id;
+      state = normalizeMaterials(normalizeMachines(s)); if (!state.products.some(p => p.id === state.cur)) state.cur = state.products[0].id;
       sync = {sha: f.sha, dirty: false, at: new Date().toISOString()}; putSync();
       save(); renderAll(); connectedUI(true); document.body.classList.remove("locked");
       status(`اتحمّلت آخر أرقام من GitHub${s.savedAt ? " (متحفظة " + when(s.savedAt) + ")" : ""}.`, "ok");
@@ -1063,7 +1154,7 @@ if (FILE_MODE) {
   });
   const markDirty = e => { if (e.target.closest && e.target.closest("#ghbar")) return; if (ls.get(TOKEN_KEY)) { sync.dirty = true; putSync(); if (!$("ghStatus").classList.contains("warn")) status("فيه تعديلات لسه مش محفوظة على GitHub.", "warn"); } };
   document.addEventListener("input", markDirty);
-  document.addEventListener("click", e => { if (e.target.closest('[data-act],#addPart,#addAcc,#addMachine,#bulkAdd,#dup,#del,#reset,#tabs .add,#useProd')) markDirty(e); });
+  document.addEventListener("click", e => { if (e.target.closest('[data-act],#addPart,#addAcc,#addMachine,#bulkAdd,#addMat,#dup,#del,#reset,#tabs .add,#useProd')) markDirty(e); });
   if (PUBLIC && !ls.get(TOKEN_KEY)) document.body.classList.add("locked");
   if (ls.get(TOKEN_KEY)) {
     connectedUI(true);
