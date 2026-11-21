@@ -187,6 +187,10 @@ details.part[open] > summary .caret::before{content:"▾"}
 .rtitle{font:700 15px var(--display);color:var(--brass-ink)}
 .acc:not(.matrow){background:var(--bg);border-radius:10px;padding:8px}
 .mixbox{grid-column:1/-1;gap:6px}
+.dyechk{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:14px;background:var(--surface)}
+.dyechk:has(input:checked){border-color:#c2378a;background:color-mix(in srgb, #c2378a 10%, var(--surface))}
+.dyechk input{width:17px;height:17px;accent-color:#c2378a}
+.dyerow{background:color-mix(in srgb, #c2378a 7%, transparent);border-radius:10px;padding:6px}
 .acc.matrow{grid-template-columns:minmax(0,1fr) 130px auto}
 @media (max-width:520px){.acc.matrow{grid-template-columns:minmax(0,1fr) 112px auto}.acc.matrow .f:first-child{grid-column:auto}}
 .mixrow{display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:8px;align-items:center}
@@ -369,6 +373,8 @@ td .pill{font-size:11.5px}
     <form class="panel groups" id="mform" autocomplete="off">
       <fieldset class="global">
         <legend>الخامات وأسعارها <span class="tagall">لكل المنتجات</span> <small>سعر الكيلو</small></legend>
+        <div class="fields"><div class="f"><label for="dyePct">نسبة الصبغة</label><div class="inp"><input id="dyePct" data-g="dyePct" type="number" min="0" max="50" step="any"><span class="u">%</span></div>
+          <small>بتتحط أوتوماتيك في أي جزء متعلّم عليه «فيها صبغة». واكتب سعر كيلو الصبغة تحت.</small></div></div>
         <div class="rowlist" id="mats"></div>
         <button type="button" class="btn ghost" id="addMat">+ خامة جديدة</button>
       </fieldset>
@@ -540,17 +546,23 @@ const machineLabel = m => `${m.brand && m.brand !== "other" ? BRANDS[m.brand] + 
 /* Materials: shared list with a price per kg; each part uses a blend of them by percent. */
 const MATERIALS = () => [
   {id:"pp", name:"بولي بروبلين (PP)", price:0}, {id:"pet", name:"PET", price:0},
-  {id:"ps_clear", name:"مخرز شفاف", price:90}, {id:"ps_cafe", name:"مخرز كافيه", price:0}, {id:"ps_color", name:"مخرز ألوان", price:0}
+  {id:"ps_clear", name:"مخرز شفاف", price:90}, {id:"ps_cafe", name:"مخرز كافيه", price:0}, {id:"ps_color", name:"مخرز ألوان", price:0},
+  {id:"dye", name:"صبغة", price:0, dye:true}
 ];
+const DYE_ID = "dye";
+const dyeShare = pt => pt.dye ? Math.min(Math.max(num(state.g.dyePct), 0), 50) / 100 : 0;   // the dye takes this share of every kilo
 const matById = id => (state.materials || []).find(x => x.id === id);
-function matPrice(pt){
+function basePrice(pt){
   const mix = pt.mix || [];
   if (!mix.length) return num(pt.mat);                       // older parts: one price typed by hand
   const tot = mix.reduce((s,x) => s + num(x.pct), 0); if (!tot) return 0;
   return mix.reduce((s,x) => s + num(x.pct) / tot * num((matById(x.m) || {}).price), 0);
 }
+// Ticked "فيها صبغة": the dye replaces its share of the blend, the rest keeps the blend's proportions.
+function matPrice(pt){ const d = dyeShare(pt); return basePrice(pt) * (1 - d) + d * num((matById(DYE_ID) || {}).price); }
 const mixTotal = pt => (pt.mix || []).reduce((s,x) => s + num(x.pct), 0);
-const mixShort = pt => (pt.mix || []).length ? pt.mix.map(x => `${(matById(x.m) || {name:"؟"}).name} ${num(x.pct)}%`).join(" + ") : "سعر يدوي";
+const mixShort = pt => ((pt.mix || []).length ? pt.mix.map(x => `${(matById(x.m) || {name:"؟"}).name} ${num(x.pct)}%`).join(" + ") : "سعر يدوي")
+  + (pt.dye ? ` + صبغة ${num(state.g.dyePct)}%` : "");
 function normalizeMaterials(st){
   if (!Array.isArray(st.materials)) {
     st.materials = MATERIALS();
@@ -558,6 +570,8 @@ function normalizeMaterials(st){
     const mode = Object.keys(counts).sort((a,b) => counts[b] - counts[a])[0];
     if (mode && +mode > 0) st.materials.find(x => x.id === "ps_clear").price = +mode;
   }
+  if (!st.materials.some(x => x.id === DYE_ID)) st.materials.push({id: DYE_ID, name: "صبغة", price: 0, dye: true});
+  st.g = st.g || {}; if (st.g.dyePct == null) st.g.dyePct = 2;
   const clear = st.materials.find(x => x.id === "ps_clear");
   (st.products || []).forEach(p => (p.prod ? p.prod.parts : []).forEach(pt => {
     if (pt.mix) return;
@@ -654,8 +668,10 @@ function prodCalc(p){
     const q = num(pt.qty);
     material += mat * q;
     const tot = mixTotal(pt);
-    if (tot) pt.mix.forEach(x => { kgBy[x.m] = (kgBy[x.m] || 0) + kgPiece * q * num(x.pct) / tot; });
-    else kgBy._manual = (kgBy._manual || 0) + kgPiece * q;
+    const d = dyeShare(pt);
+    if (tot) pt.mix.forEach(x => { kgBy[x.m] = (kgBy[x.m] || 0) + kgPiece * q * (1 - d) * num(x.pct) / tot; });
+    else kgBy._manual = (kgBy._manual || 0) + kgPiece * q * (1 - d);
+    if (d) kgBy[DYE_ID] = (kgBy[DYE_ID] || 0) + kgPiece * q * d;
     if (good) { elec += rate.elec/good*q; labor += rate.labor/good*q; extra += rate.extra/good*q; }
     moldTotal += num(pt.mold);
     if (q && good) setsPerHour = Math.min(setsPerHour, good / q);
@@ -754,11 +770,12 @@ function renderProdForm(){
         ${F("وزن القطعة", `type="number" min="0" step="any" data-k="weight" value="${pt.weight}"`, "جرام", "على الميزان بعد الحقن")}
         <div class="f mixbox"><label>الخامة</label>
           ${(pt.mix || []).length ? pt.mix.map((x,j) => `<div class="mixrow" data-j="${j}">
-              <div class="inp"><select data-mk="m">${state.materials.map(mt => `<option value="${mt.id}" ${mt.id===x.m?"selected":""}>${esc(mt.name)}</option>`).join("")}</select></div>
+              <div class="inp"><select data-mk="m">${state.materials.filter(mt => !mt.dye || mt.id === x.m).map(mt => `<option value="${mt.id}" ${mt.id===x.m?"selected":""}>${esc(mt.name)}</option>`).join("")}</select></div>
               <div class="inp pct"><input type="number" min="0" max="100" step="any" data-mk="pct" value="${x.pct}"><span class="u">%</span></div>
               <button type="button" class="btn small" data-act="delMix" data-i="${i}" data-j="${j}" aria-label="شيل الخامة">×</button></div>`).join("")
             : `<div class="inp"><input type="number" min="0" step="any" data-k="mat" value="${pt.mat}"><span class="u">جنيه / كيلو (سعر يدوي)</span></div>`}
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn small" data-act="addMix" data-i="${i}">+ ${(pt.mix || []).length ? "خامة تانية في الخلطة" : "اختار الخامة بدل السعر اليدوي"}</button>
+          <label class="dyechk"><input type="checkbox" data-k="dye" ${pt.dye ? "checked" : ""}><span>فيها صبغة <b>${num(state.g.dyePct)}%</b></span></label>
           <small data-mixout="part-${i}"></small></div></div>
         ${F("هالك المصبات", `type="number" min="0" step="any" data-k="waste" value="${pt.waste}"`, "%", "رنر ومصبات مش بترجع")}
         ${F("زمن الدورة", `type="number" min="0" step="any" data-k="cycle" value="${pt.cycle}"`, "ثانية", "من قفل الاسطمبة للقفلة اللي بعدها")}
@@ -779,11 +796,12 @@ function renderProdForm(){
       ${F("العدد في السِت", `type="number" min="0" step="any" data-k="qty" value="${a.qty}"`)}
       <button type="button" class="btn small" data-act="delAcc" data-i="${i}" style="margin-bottom:6px">حذف</button>
     </div>`).join("") : `<p class="note">مفيش إكسسوارات لسه.</p>`;
+  $("dyePct").value = state.g.dyePct;
   $("mats").innerHTML = state.materials.map((mt,i) => `
-    <div class="acc matrow" data-scope="mat" data-i="${i}">
+    <div class="acc matrow${mt.dye ? " dyerow" : ""}" data-scope="mat" data-i="${i}">
       ${F("الخامة", `type="text" data-k="name" value="${esc(mt.name)}"`)}
       ${F("سعر الكيلو", `type="number" min="0" step="any" data-k="price" value="${mt.price}"`, "جنيه")}
-      <button type="button" class="btn small" data-act="delMat" data-i="${i}" style="margin-bottom:6px">حذف</button>
+      ${mt.dye ? `<span class="note" style="margin-bottom:10px">بتتحط أوتوماتيك</span>` : `<button type="button" class="btn small" data-act="delMat" data-i="${i}" style="margin-bottom:6px">حذف</button>`}
     </div>`).join("");
   $("machines").innerHTML = state.machines.map((m,i) => `
     <div class="card" data-scope="machine" data-i="${i}">
@@ -817,10 +835,13 @@ function renderProdResult(){
   $("partRows").innerHTML = c.rows.map((r,i) => `<tr><td style="color:${partColor(i)};font-weight:600"><i class="dot" style="background:${partColor(i)}"></i>${esc(r.name)}</td><td>${fmt1(r.mat)}</td><td>${fmt1(r.mach)}</td><td><b>${fmt1(r.piece)}</b></td><td>${fmt(r.good)}</td></tr>`).join("");
   cur().prod.parts.forEach((pt,i) => {
     const el = document.querySelector(`[data-mixout="part-${i}"]`); if (!el) return;
-    if (!(pt.mix || []).length) { el.textContent = ""; return; }
+    const d = dyeShare(pt), dyeM = matById(DYE_ID) || {name:"صبغة", price:0};
+    if (!(pt.mix || []).length) { el.innerHTML = d ? `كيلو الخامة بـ <b>${fmt1(matPrice(pt))}</b> ج · في كل كيلو ${fmt(d * 1000)} جم صبغة` : ""; return; }
     const tot = mixTotal(pt);
-    const grams = pt.mix.map(x => `${fmt(tot ? num(x.pct) / tot * 1000 : 0)} جم ${(matById(x.m) || {name:"؟"}).name}`).join(" + ");
+    const grams = pt.mix.map(x => `${fmt(tot ? (1 - d) * num(x.pct) / tot * 1000 : 0)} جم ${(matById(x.m) || {name:"؟"}).name}`).join(" + ")
+      + (d ? ` + <b>${fmt(d * 1000)} جم صبغة</b>` : "");
     const zero = pt.mix.filter(x => !num((matById(x.m) || {}).price)).map(x => (matById(x.m) || {name:"؟"}).name);
+    if (d && !num(dyeM.price)) zero.push(dyeM.name);
     el.innerHTML = `كيلو الخلطة بـ <b>${fmt1(matPrice(pt))}</b> ج · في كل كيلو: ${grams}`
       + (Math.abs(tot - 100) > 0.01 ? ` <span style="color:var(--warn)">· مجموع النسب ${fmt1(tot)}% مش 100%</span>` : "")
       + (zero.length ? ` <span style="color:var(--warn)">· ${zero.join(" و")} لسه مالهاش سعر. <button type="button" class="linkbtn" data-goview="materials">اكتب السعر في تاب الخامات</button></span>` : "");
@@ -892,7 +913,7 @@ function renderAll(){ renderTabs(); renderView(); renderProdForm(); fillProfitFo
 /* ---------- events ---------- */
 const onFormInput = e => {
   const t = e.target, p = cur(), pr = p.prod;
-  const val = t.type === "number" ? (t.value === "" ? 0 : Number(t.value)) : t.value;
+  const val = t.type === "checkbox" ? t.checked : t.type === "number" ? (t.value === "" ? 0 : Number(t.value)) : t.value;
   const row = t.closest("[data-scope]");
   if (row) {
     const i = +row.dataset.i, k = t.dataset.k;
@@ -910,7 +931,8 @@ const onFormInput = e => {
         row.querySelector(".card-h b").textContent = machineLabel(m);
         document.querySelectorAll('select[data-k="machine"]').forEach(s => { const v = s.value; s.innerHTML = machineOptions(v); }); }
     }
-  } else if (t.dataset.g) state.g[t.dataset.g] = val;
+  } else if (t.dataset.g) { state.g[t.dataset.g] = val;
+    if (t.dataset.g === "dyePct") document.querySelectorAll(".dyechk b").forEach(b => b.textContent = num(val) + "%"); }
   else if (t.dataset.k === "name") { p.name = val; renderTabs(); $("name").value = val; }  // renderTabs refreshes the titles
   else if (t.dataset.k) pr[t.dataset.k] = val;
   refreshNumbers(); save();
