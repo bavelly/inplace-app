@@ -16,6 +16,8 @@
   --display:"Readex Pro", "Segoe UI", system-ui, sans-serif;
   --body:"IBM Plex Sans Arabic", "Segoe UI", Tahoma, system-ui, sans-serif;
   --seg1:#3c4a5c; --seg2:#7a8797; --seg3:#5f7f9e; --seg4:#b9c3cf; --seg5:#c0634f; --seg6:#8b6aa8; --seg7:#9aa3ad; --seg8:#c9a24e;
+  --p1:#2f6fd6; --p2:#0f8a7e; --p3:#7b4fc9; --p4:#d06a12; --p5:#3f8f2f; --p6:#c2378a; --p7:#1d86ad; --p8:#c8463c;
+  --steel:#4a6278; --steel-soft:#e9eef3; --brass-ink:#7a5610;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark){
@@ -24,6 +26,8 @@
     --brass:#d9aa4c; --brass-soft:#2e2717;
     --good:#5cc78f; --good-bg:#16291f; --warn:#e5b04f; --warn-bg:#2d2412; --bad:#f08a80; --bad-bg:#331b19;
     --seg1:#8fa2b8; --seg2:#5d6977; --seg3:#7ea3c6; --seg4:#3f4954; --seg5:#d98270; --seg6:#a98cc4; --seg7:#6c757e; --seg8:#b8913f;
+    --p1:#7aa7f2; --p2:#4fc4b6; --p3:#ad8ef0; --p4:#f0a45e; --p5:#82c96e; --p6:#ee7fbf; --p7:#6cc3e4; --p8:#f08a80;
+    --steel:#9fb6cb; --steel-soft:#1f262e; --brass-ink:#e8c47a;
     color-scheme: dark;
   }
 }
@@ -32,6 +36,8 @@
   --brass:#d9aa4c; --brass-soft:#2e2717;
   --good:#5cc78f; --good-bg:#16291f; --warn:#e5b04f; --warn-bg:#2d2412; --bad:#f08a80; --bad-bg:#331b19;
   --seg1:#8fa2b8; --seg2:#5d6977; --seg3:#7ea3c6; --seg4:#3f4954; --seg5:#d98270; --seg6:#a98cc4; --seg7:#6c757e; --seg8:#b8913f;
+  --p1:#7aa7f2; --p2:#4fc4b6; --p3:#ad8ef0; --p4:#f0a45e; --p5:#82c96e; --p6:#ee7fbf; --p7:#6cc3e4; --p8:#f08a80;
+  --steel:#9fb6cb; --steel-soft:#1f262e; --brass-ink:#e8c47a;
   color-scheme: dark;
 }
 *{box-sizing:border-box}
@@ -52,7 +58,7 @@ h1 span{color:var(--brass);font-family:var(--display)}
 .tab{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:4px 4px 4px 14px;font:500 14px var(--body);cursor:pointer}
 .tab img,.tab .ph{width:30px;height:30px;border-radius:50%;object-fit:cover;background:var(--brass-soft)}
 .tab .ph{display:grid;place-items:center;color:var(--brass);font-weight:600}
-.tab[aria-selected="true"]{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass) inset;background:var(--brass-soft)}
+.tab[aria-selected="true"]{border-color:var(--brass);background:var(--brass);color:#fff;font-weight:600;box-shadow:0 2px 8px color-mix(in srgb, var(--brass) 35%, transparent)}
 .tab.add{padding:8px 14px;border-style:dashed;color:var(--muted)}
 
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:3px;gap:3px;align-self:flex-start}
@@ -141,6 +147,28 @@ body.locked #lockNote{display:block}
 .autoline b{font-weight:700}
 .autoline span{color:var(--muted);font-size:12.5px}
 .linkbtn{border:0;background:none;padding:0;color:var(--brass);font:inherit;text-decoration:underline;cursor:pointer}
+/* product header: the product's name is the loudest thing on the form */
+.name-row{background:linear-gradient(135deg, var(--brass-soft), color-mix(in srgb, var(--brass-soft) 40%, var(--surface)));border:1px solid color-mix(in srgb, var(--brass) 45%, transparent);border-radius:12px;padding:12px 14px;margin:-4px -4px 0}
+.name-row .ptitle{display:block;font:700 22px/1.25 var(--display);color:var(--brass-ink);margin-bottom:4px;text-wrap:balance}
+.name-row label{font-size:12.5px;color:var(--muted);font-weight:500}
+.name-row .inp{background:var(--surface)}
+/* section headings */
+legend{padding-inline-start:10px;border-inline-start:4px solid var(--ink)}
+fieldset.global{background:var(--steel-soft);border-radius:12px;padding:14px;margin:0 -4px}
+fieldset.global legend{border-color:var(--steel);color:var(--steel);float:right;width:100%}
+fieldset.global legend small{color:var(--steel);opacity:.85}
+fieldset.global .card{background:var(--surface)}
+fieldset.global .card-h b{color:var(--steel);font-size:16px}
+.tagall{font:600 11.5px var(--body);background:var(--steel);color:var(--surface);border-radius:999px;padding:2px 9px}
+/* each part gets its own colour, used on its card and in the results table */
+.card.part{border-inline-start:6px solid var(--pc);padding-top:0;overflow:hidden}
+.card.part > .card-h{background:color-mix(in srgb, var(--pc) 12%, var(--surface));margin:0 -12px;padding:10px 12px;border-bottom:1px solid color-mix(in srgb, var(--pc) 25%, transparent)}
+.card.part > .card-h b{color:var(--pc);font-size:16px;display:flex;align-items:center;gap:8px}
+.pnum{display:inline-grid;place-items:center;min-width:24px;height:24px;border-radius:999px;background:var(--pc);color:#fff;font:700 13px var(--display)}
+.card.part .chip{border-color:color-mix(in srgb, var(--pc) 30%, transparent)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:6px;vertical-align:middle}
+.rtitle{font:700 15px var(--display);color:var(--brass-ink)}
+.acc:not(.matrow){background:var(--bg);border-radius:10px;padding:8px}
 .mixbox{grid-column:1/-1;gap:6px}
 .acc.matrow{grid-template-columns:minmax(0,1fr) 130px auto}
 @media (max-width:520px){.acc.matrow{grid-template-columns:minmax(0,1fr) 112px auto}.acc.matrow .f:first-child{grid-column:auto}}
@@ -248,6 +276,7 @@ td .pill{font-size:11.5px}
       <div class="name-row">
         <span class="thumb"></span>
         <div class="f">
+          <b class="ptitle"></b>
           <label for="pname">اسم المنتج</label>
           <div class="inp"><input id="pname" data-k="name" type="text"></div>
         </div>
@@ -283,14 +312,14 @@ td .pill{font-size:11.5px}
         </div>
       </fieldset>
       <hr>
-      <fieldset>
-        <legend>الخامات وأسعارها <small>مشتركة بين كل المنتجات · سعر الكيلو</small></legend>
+      <fieldset class="global">
+        <legend>الخامات وأسعارها <span class="tagall">لكل المنتجات</span> <small>سعر الكيلو</small></legend>
         <div class="rowlist" id="mats"></div>
         <button type="button" class="btn ghost" id="addMat">+ خامة جديدة</button>
       </fieldset>
       <hr>
-      <fieldset>
-        <legend>المكن <small>Haitian · Sonly · Hwamda · مشتركة بين كل المنتجات</small></legend>
+      <fieldset class="global">
+        <legend>المكن <span class="tagall">لكل المنتجات</span> <small>Haitian · Sonly · Hwamda</small></legend>
         <p class="note">الكهربا محسوبة من قدرة الموتور والسخانات اللي على لوحة المكنة: السيرفو بيسحب في المتوسط حوالي ٤٠٪ من قدرة الموتور، والطلمبة الثابتة حوالي ٧٥٪، والسخانات حوالي ٤٠٪ بعد ما الماكينة تسخن. كهربا القطعة = كهربا الساعة ÷ عدد القطع في الساعة، فكل ما زمن الدورة يقل كهربا القطعة بتقل.</p>
         <div class="fields">
           <div class="f"><label for="kwh">سعر الكيلووات ساعة</label><div class="inp"><input id="kwh" data-g="kwh" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>من فاتورة كهربا المصنع</small></div>
@@ -310,6 +339,7 @@ td .pill{font-size:11.5px}
 
     <aside class="panel result" aria-live="polite">
       <div class="hero">
+        <span class="rtitle"></span>
         <span class="lab">تكلفة إنتاج السِت</span>
         <div class="big" id="setCost">0</div>
         <span class="pill info" id="capacity"></span>
@@ -338,6 +368,7 @@ td .pill{font-size:11.5px}
       <div class="name-row">
         <span class="thumb"></span>
         <div class="f">
+          <b class="ptitle"></b>
           <label for="name">اسم المنتج</label>
           <div class="inp"><input id="name" type="text"></div>
         </div>
@@ -385,6 +416,7 @@ td .pill{font-size:11.5px}
 
     <aside class="panel result" aria-live="polite">
       <div class="hero">
+        <span class="rtitle"></span>
         <span class="lab">الربح في الأوردر اللي بيتسلم</span>
         <div class="big" id="profit">0</div>
         <span class="pill" id="status"></span>
@@ -466,6 +498,7 @@ function catalogSpec(brand, tons){
 }
 function fillFromCatalog(m){ const s = catalogSpec(m.brand, m.tons); if (s) Object.assign(m, s); return m; }
 const autoLine = m => `الموتور <b>${num(m.motorKw)}</b> ك.و · السخانات <b>${num(m.heaterKw)}</b> ك.و · أقصى حقنة <b>${fmt(num(m.shotG))}</b> جم <span>(${esc(m.src || "")})</span>`;
+const partColor = i => `var(--p${i % 8 + 1})`;
 const machineLabel = m => `${m.brand && m.brand !== "other" ? BRANDS[m.brand] + " " : ""}${num(m.tons)} طن`;
 /* Materials: shared list with a price per kg; each part uses a blend of them by percent. */
 const MATERIALS = () => [
@@ -648,6 +681,7 @@ function renderTabs(){
     `<button type="button" class="tab" role="tab" aria-selected="${p.id===state.cur}" data-id="${p.id}">${thumbHTML(p)}<span>${esc(p.name||"بدون اسم")}</span></button>`
   ).join("") + `<button type="button" class="tab add" id="add">+ منتج جديد</button>`;
   document.querySelectorAll(".thumb").forEach(t => t.innerHTML = thumbHTML(cur()));
+  document.querySelectorAll(".ptitle, .rtitle").forEach(t => t.textContent = cur().name || "بدون اسم");
 }
 function renderView(){
   const prod = state.view !== "profit";
@@ -664,8 +698,8 @@ function renderProdForm(){
   ["carton","perCarton","inner","scrap","amort","otherSet"].forEach(k => $(k).value = pr[k]);
   ["kwh","wage","hours"].forEach(k => $(k).value = state.g[k]);
   $("parts").innerHTML = pr.parts.map((pt,i) => `
-    <div class="card" data-scope="part" data-i="${i}">
-      <div class="card-h"><b>${esc(pt.name || "جزء")}</b><span class="chip" data-out="part-${i}"></span>
+    <div class="card part" data-scope="part" data-i="${i}" style="--pc:${partColor(i)}">
+      <div class="card-h"><b><span class="pnum">${i+1}</span><span class="pname">${esc(pt.name || "جزء")}</span></b><span class="chip" data-out="part-${i}"></span>
         <button type="button" class="btn small" data-act="delPart" data-i="${i}">حذف</button></div>
       <div class="fields">
         ${F("اسم الجزء", `type="text" data-k="name" value="${esc(pt.name)}"`)}
@@ -729,7 +763,7 @@ function renderProdResult(){
   $("capacity").textContent = c.setsPerHour ? `أبطأ جزء بيطلع حوالي ${fmt(c.setsPerHour)} سِت في الساعة · ${fmt(c.setsPerHour*8)} في وردية ٨ ساعات` : "كمّل بيانات الأجزاء";
   $("pbar").innerHTML = barHTML(c.parts, "", c.total);
   $("plegend").innerHTML = legendHTML(c.parts, c.total) + `<div class="tot"><i style="background:var(--ink)"></i><span>إجمالي السِت</span><span>${fmt1(c.total)}</span><span class="pc">100%</span></div>`;
-  $("partRows").innerHTML = c.rows.map(r => `<tr><td>${esc(r.name)}</td><td>${fmt1(r.mat)}</td><td>${fmt1(r.mach)}</td><td><b>${fmt1(r.piece)}</b></td><td>${fmt(r.good)}</td></tr>`).join("");
+  $("partRows").innerHTML = c.rows.map((r,i) => `<tr><td style="color:${partColor(i)};font-weight:600"><i class="dot" style="background:${partColor(i)}"></i>${esc(r.name)}</td><td>${fmt1(r.mat)}</td><td>${fmt1(r.mach)}</td><td><b>${fmt1(r.piece)}</b></td><td>${fmt(r.good)}</td></tr>`).join("");
   cur().prod.parts.forEach((pt,i) => {
     const el = document.querySelector(`[data-mixout="part-${i}"]`); if (!el) return;
     if (!(pt.mix || []).length) { el.textContent = ""; return; }
@@ -807,7 +841,7 @@ $("pform").addEventListener("input", e => {
     if (row.dataset.scope === "part") {
       const mr = t.closest(".mixrow");
       if (mr && t.dataset.mk) pr.parts[i].mix[+mr.dataset.j][t.dataset.mk] = t.dataset.mk === "pct" ? val : t.value;
-      else { pr.parts[i][k] = val; if (k === "name") row.querySelector(".card-h b").textContent = val || "جزء"; } }
+      else { pr.parts[i][k] = val; if (k === "name") row.querySelector(".card-h .pname").textContent = val || "جزء"; } }
     else if (row.dataset.scope === "mat") { state.materials[i][k] = val;
       if (k === "name") document.querySelectorAll('select[data-mk="m"]').forEach(s => { const o = s.querySelector(`option[value="${state.materials[i].id}"]`); if (o) o.textContent = val; }); }
     else if (row.dataset.scope === "acc") pr.accs[i][k] = val;
@@ -819,7 +853,7 @@ $("pform").addEventListener("input", e => {
         document.querySelectorAll('select[data-k="machine"]').forEach(s => { const v = s.value; s.innerHTML = machineOptions(v); }); }
     }
   } else if (t.dataset.g) state.g[t.dataset.g] = val;
-  else if (t.dataset.k === "name") { p.name = val; renderTabs(); $("name").value = val; }
+  else if (t.dataset.k === "name") { p.name = val; renderTabs(); $("name").value = val; }  // renderTabs refreshes the titles
   else if (t.dataset.k) pr[t.dataset.k] = val;
   refreshNumbers(); save();
 });
