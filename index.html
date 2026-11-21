@@ -321,9 +321,11 @@ td .pill{font-size:11.5px}
       <fieldset>
         <legend>الكرتونة والتغليف</legend>
         <div class="fields">
-          <div class="f"><label for="carton">سعر الكرتونة</label><div class="inp"><input id="carton" data-k="carton" type="number" min="0" step="any"><span class="u">جنيه</span></div></div>
-          <div class="f"><label for="perCarton">كام سِت في الكرتونة</label><div class="inp"><input id="perCarton" data-k="perCarton" type="number" min="1" step="1"><span class="u">سِت</span></div></div>
+          <div class="f"><label for="carton">سعر علبة السِت</label><div class="inp"><input id="carton" data-k="carton" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>الكرتونة الصغيرة اللي السِت بيتباع فيها</small></div>
+          <div class="f"><label for="perCarton">كام سِت في العلبة</label><div class="inp"><input id="perCarton" data-k="perCarton" type="number" min="1" step="1"><span class="u">سِت</span></div><small>عادةً 1</small></div>
           <div class="f"><label for="inner">تغليف داخلي للسِت</label><div class="inp"><input id="inner" data-k="inner" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>فوم، نايلون، فواصل</small></div>
+          <div class="f"><label for="master">سعر الكرتونة الخارجية</label><div class="inp"><input id="master" data-k="master" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>الحاوية الكبيرة اللي بتشيل كذا علبة</small></div>
+          <div class="f"><label for="perMaster">كام علبة جوه الكرتونة الخارجية</label><div class="inp"><input id="perMaster" data-k="perMaster" type="number" min="1" step="1"><span class="u">علبة</span></div><small id="masterNote"></small></div>
         </div>
       </fieldset>
       <hr>
@@ -621,7 +623,7 @@ normalizeMachines(state); normalizeMaterials(state);
 const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch(e) {} };
 const cur = () => state.products.find(p => p.id === state.cur) || state.products[0];
 const uid = p => p + Date.now().toString(36) + Math.floor(Math.random()*1e4);
-const blankProd = () => ({parts:[{name:"جزء ١", qty:1, machine:bestMachine(state.machines, 309), weight:300, waste:3, mat:90, mix:[{m:"ps_clear", pct:100}], cycle:45, cav:1, mold:0}], accs:[], carton:0, perCarton:1, inner:0, scrap:3, amort:0, otherSet:0});
+const blankProd = () => ({parts:[{name:"جزء ١", qty:1, machine:bestMachine(state.machines, 309), weight:300, waste:3, mat:90, mix:[{m:"ps_clear", pct:100}], cycle:45, cav:1, mold:0}], accs:[], carton:0, perCarton:1, inner:0, master:0, perMaster:1, scrap:3, amort:0, otherSet:0});
 
 const fmt = n => isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—";
 const fmt1 = n => !isFinite(n) ? "—" : Math.abs(n) < 100 ? (Math.round(n*10)/10).toLocaleString("en-US") : fmt(n);
@@ -662,7 +664,7 @@ function prodCalc(p){
       over: num(m.shotG) && shot > num(m.shotG) ? {shot, cap: num(m.shotG)} : null};
   });
   const accs = pr.accs.reduce((s,a) => s + num(a.price)*num(a.qty), 0);
-  const pack = num(pr.carton) / Math.max(1, num(pr.perCarton)) + num(pr.inner);
+  const pack = num(pr.carton) / Math.max(1, num(pr.perCarton)) + num(pr.inner) + num(pr.master) / Math.max(1, num(pr.perMaster)) / Math.max(1, num(pr.perCarton));
   const mold = num(pr.amort) ? moldTotal / num(pr.amort) : 0;
   const other = num(pr.otherSet);
   const total = material + elec + labor + extra + accs + pack + mold + other;
@@ -733,7 +735,8 @@ const F = (label, attrs, unit, hint) => `<div class="f"><label>${label}</label><
 function renderProdForm(){
   const p = cur(); if (!p.prod) p.prod = blankProd(); const pr = p.prod;
   $("pname").value = p.name || "";
-  ["carton","perCarton","inner","scrap","amort","otherSet"].forEach(k => $(k).value = pr[k]);
+  if (pr.master == null) pr.master = 0; if (pr.perMaster == null) pr.perMaster = 1;
+  ["carton","perCarton","inner","master","perMaster","scrap","amort","otherSet"].forEach(k => $(k).value = pr[k]);
   ["kwh","wage","hours"].forEach(k => $(k).value = state.g[k]);
   $("parts").innerHTML = pr.parts.map((pt,i) => `
     <details class="part" data-scope="part" data-i="${i}" style="--pc:${partColor(i)}" ${openParts.has(i) ? "open" : ""}>
@@ -822,6 +825,8 @@ function renderProdResult(){
       + (Math.abs(tot - 100) > 0.01 ? ` <span style="color:var(--warn)">· مجموع النسب ${fmt1(tot)}% مش 100%</span>` : "")
       + (zero.length ? ` <span style="color:var(--warn)">· ${zero.join(" و")} لسه مالهاش سعر. <button type="button" class="linkbtn" data-goview="materials">اكتب السعر في تاب الخامات</button></span>` : "");
   });
+  { const pr = cur().prod; const share = num(pr.master) / Math.max(1, num(pr.perMaster)) / Math.max(1, num(pr.perCarton));
+    $("masterNote").textContent = num(pr.master) ? `يعني السِت بيشيل ${fmt1(share)} ج من الكرتونة الخارجية` : "لو مفيش كرتونة خارجية سيبها 0"; }
   $("matUse").innerHTML = Object.entries(c.kgBy).filter(([,kg]) => kg > 0).map(([id,kg]) => { const mt = matById(id);
     return `<tr><td>${id === "_manual" ? "خامة بسعر يدوي" : esc(mt ? mt.name : "؟")}</td><td>${(Math.round(kg*1000)/1000).toLocaleString("en-US")} كجم</td><td>${mt ? fmt1(kg * num(mt.price)) + " ج" : "—"}</td></tr>`; }).join("");
   c.rows.forEach((r,i) => {
