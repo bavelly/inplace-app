@@ -61,6 +61,11 @@ h1 span{color:var(--brass);font-family:var(--display)}
 .tab[aria-selected="true"]{border-color:var(--brass);background:var(--brass);color:#fff;font-weight:600;box-shadow:0 2px 8px color-mix(in srgb, var(--brass) 35%, transparent)}
 .tab.add{padding:8px 14px;border-style:dashed;color:var(--muted)}
 
+.viewbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.seg.settings button[aria-selected="true"]{background:var(--steel);color:var(--surface)}
+.seg.settings button{color:var(--steel)}
+.settings-view{max-width:980px;width:100%}
+.settings-view fieldset.global{margin:0}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:3px;gap:3px;align-self:flex-start}
 .seg button{font:600 15px var(--display);border:0;background:transparent;color:var(--muted);padding:8px 16px;border-radius:8px;cursor:pointer}
 .seg button[aria-selected="true"]{background:var(--ink);color:var(--surface)}
@@ -138,7 +143,7 @@ hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 .gh-row b{font:700 15px var(--display)}
 .gh-token{flex:1;min-width:220px}
 .btn.primary{background:var(--ink);color:var(--surface);border-color:var(--ink)}
-body.locked .grid, body.locked .seg, body.locked #tabs, body.locked .wrap > section.panel:not(#ghbar), body.locked header > div:last-child{display:none !important}
+body.locked .grid, body.locked .seg, body.locked .settings-view, body.locked #tabs, body.locked .wrap > section.panel:not(#ghbar), body.locked header > div:last-child{display:none !important}
 #lockNote{display:none}
 #reset{display:none !important}
 body.locked #lockNote{display:block}
@@ -277,9 +282,15 @@ td .pill{font-size:11.5px}
   </section>
   <nav class="tabs" id="tabs" role="tablist" aria-label="المنتجات"></nav>
 
-  <div class="seg" role="tablist" aria-label="الحساب">
-    <button type="button" role="tab" id="vProd" data-view="production">١ · تكلفة الإنتاج (المصنعية)</button>
-    <button type="button" role="tab" id="vProfit" data-view="profit">٢ · الربح والتسعير</button>
+  <div class="viewbar">
+    <div class="seg" role="tablist" aria-label="حساب المنتج">
+      <button type="button" role="tab" id="vProd" data-view="production">١ · تكلفة الإنتاج (المصنعية)</button>
+      <button type="button" role="tab" id="vProfit" data-view="profit">٢ · الربح والتسعير</button>
+    </div>
+    <div class="seg settings" role="tablist" aria-label="إعدادات المصنع">
+      <button type="button" role="tab" id="vMat" data-view="materials">الخامات</button>
+      <button type="button" role="tab" id="vMach" data-view="machines">المكن</button>
+    </div>
   </div>
 
   <!-- ===== Production view ===== -->
@@ -324,30 +335,6 @@ td .pill{font-size:11.5px}
           <div class="f"><label for="otherSet">مصاريف تانية للسِت</label><div class="inp"><input id="otherSet" data-k="otherSet" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>نقل، تشطيب يدوي، تغليف عمالة</small></div>
         </div>
       </fieldset>
-      <hr>
-      <fieldset class="global">
-        <legend>الخامات وأسعارها <span class="tagall">لكل المنتجات</span> <small>سعر الكيلو</small></legend>
-        <div class="rowlist" id="mats"></div>
-        <button type="button" class="btn ghost" id="addMat">+ خامة جديدة</button>
-      </fieldset>
-      <hr>
-      <fieldset class="global">
-        <legend>المكن <span class="tagall">لكل المنتجات</span> <small>Haitian · Sonly · Hwamda</small></legend>
-        <p class="note">الكهربا محسوبة من قدرة الموتور والسخانات اللي على لوحة المكنة: السيرفو بيسحب في المتوسط حوالي ٤٠٪ من قدرة الموتور، والطلمبة الثابتة حوالي ٧٥٪، والسخانات حوالي ٤٠٪ بعد ما الماكينة تسخن. كهربا القطعة = كهربا الساعة ÷ عدد القطع في الساعة، فكل ما زمن الدورة يقل كهربا القطعة بتقل.</p>
-        <div class="fields">
-          <div class="f"><label for="kwh">سعر الكيلووات ساعة</label><div class="inp"><input id="kwh" data-g="kwh" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>من فاتورة كهربا المصنع</small></div>
-          <div class="f"><label for="wage">مرتب العامل في الشهر</label><div class="inp"><input id="wage" data-g="wage" type="number" min="0" step="any"><span class="u">جنيه</span></div></div>
-          <div class="f"><label for="hours">ساعات شغل العامل في الشهر</label><div class="inp"><input id="hours" data-g="hours" type="number" min="1" step="1"><span class="u">ساعة</span></div><small>٢٦ يوم × ٨ ساعات = ٢٠٨</small></div>
-        </div>
-        <div class="rowlist" id="machines"></div>
-        <button type="button" class="btn ghost" id="addMachine">+ إضافة مكنة</button>
-        <div class="card">
-          <b style="font:600 15px var(--display)">ضيف كذا مكنة مرة واحدة</b>
-          <p class="note">اكتب كل مكنة في سطر: الطن والماركة (هيتيان، سونلي، حوامده). لو عندك أكتر من واحدة من نفس النوع اكتب العدد، زي «3 × 250 هيتيان». الكيلووات وأقصى حقنة بيتحسبوا أوتوماتيك.</p>
-          <div class="inp"><textarea id="bulkText" rows="4" style="flex:1;border:0;background:transparent;color:var(--ink);font:500 15px var(--body);padding:8px 10px;resize:vertical;outline:none" placeholder="120 هيتيان&#10;3 × 250 هيتيان&#10;438 سونلي&#10;1300 هيتيان"></textarea></div>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn" id="bulkAdd">ضيف المكن دي</button><span class="note" id="bulkNote"></span></div>
-        </div>
-      </fieldset>
     </form>
 
     <aside class="panel result" aria-live="polite">
@@ -373,6 +360,40 @@ td .pill{font-size:11.5px}
       </div>
       <label class="link"><input type="checkbox" id="useProd"><span>استخدم تكلفة الإنتاج دي كتكلفة المنتج في حساب الربح</span></label>
     </aside>
+  </div>
+
+  <!-- ===== Materials view ===== -->
+  <div id="viewMaterials" class="settings-view">
+    <form class="panel groups" id="mform" autocomplete="off">
+      <fieldset class="global">
+        <legend>الخامات وأسعارها <span class="tagall">لكل المنتجات</span> <small>سعر الكيلو</small></legend>
+        <div class="rowlist" id="mats"></div>
+        <button type="button" class="btn ghost" id="addMat">+ خامة جديدة</button>
+      </fieldset>
+    </form>
+  </div>
+
+  <!-- ===== Machines view ===== -->
+  <div id="viewMachines" class="settings-view">
+    <form class="panel groups" id="kform" autocomplete="off">
+      <fieldset class="global">
+        <legend>المكن <span class="tagall">لكل المنتجات</span> <small>Haitian · Sonly · Hwamda</small></legend>
+        <p class="note">الكهربا محسوبة من قدرة الموتور والسخانات اللي على لوحة المكنة: السيرفو بيسحب في المتوسط حوالي ٤٠٪ من قدرة الموتور، والطلمبة الثابتة حوالي ٧٥٪، والسخانات حوالي ٤٠٪ بعد ما الماكينة تسخن. كهربا القطعة = كهربا الساعة ÷ عدد القطع في الساعة، فكل ما زمن الدورة يقل كهربا القطعة بتقل.</p>
+        <div class="fields">
+          <div class="f"><label for="kwh">سعر الكيلووات ساعة</label><div class="inp"><input id="kwh" data-g="kwh" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>من فاتورة كهربا المصنع</small></div>
+          <div class="f"><label for="wage">مرتب العامل في الشهر</label><div class="inp"><input id="wage" data-g="wage" type="number" min="0" step="any"><span class="u">جنيه</span></div></div>
+          <div class="f"><label for="hours">ساعات شغل العامل في الشهر</label><div class="inp"><input id="hours" data-g="hours" type="number" min="1" step="1"><span class="u">ساعة</span></div><small>٢٦ يوم × ٨ ساعات = ٢٠٨</small></div>
+        </div>
+        <div class="rowlist" id="machines"></div>
+        <button type="button" class="btn ghost" id="addMachine">+ إضافة مكنة</button>
+        <div class="card">
+          <b style="font:600 15px var(--display)">ضيف كذا مكنة مرة واحدة</b>
+          <p class="note">اكتب كل مكنة في سطر: الطن والماركة (هيتيان، سونلي، حوامده). لو عندك أكتر من واحدة من نفس النوع اكتب العدد، زي «3 × 250 هيتيان». الكيلووات وأقصى حقنة بيتحسبوا أوتوماتيك.</p>
+          <div class="inp"><textarea id="bulkText" rows="4" style="flex:1;border:0;background:transparent;color:var(--ink);font:500 15px var(--body);padding:8px 10px;resize:vertical;outline:none" placeholder="120 هيتيان&#10;3 × 250 هيتيان&#10;438 سونلي&#10;1300 هيتيان"></textarea></div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn" id="bulkAdd">ضيف المكن دي</button><span class="note" id="bulkNote"></span></div>
+        </div>
+      </fieldset>
+    </form>
   </div>
 
   <!-- ===== Profit view ===== -->
@@ -697,11 +718,14 @@ function renderTabs(){
   document.querySelectorAll(".thumb").forEach(t => t.innerHTML = thumbHTML(cur()));
   document.querySelectorAll(".ptitle, .rtitle").forEach(t => t.textContent = cur().name || "بدون اسم");
 }
+const VIEWS = {production:["viewProduction","vProd"], profit:["viewProfit","vProfit"], materials:["viewMaterials","vMat"], machines:["viewMachines","vMach"]};
 function renderView(){
-  const prod = state.view !== "profit";
-  $("viewProduction").hidden = !prod; $("viewProfit").hidden = prod;
-  $("vProd").setAttribute("aria-selected", prod); $("vProfit").setAttribute("aria-selected", !prod);
+  if (!VIEWS[state.view]) state.view = "production";
+  Object.entries(VIEWS).forEach(([k,[view,btn]]) => { $(view).hidden = k !== state.view; $(btn).setAttribute("aria-selected", k === state.view); });
+  // product tabs only matter while working on a product
+  $("tabs").hidden = state.view === "materials" || state.view === "machines";
 }
+function goView(v){ state.view = v; save(); renderView(); window.scrollTo({top: 0}); }
 function machineOptions(sel){
   return state.machines.map(m => `<option value="${m.id}" ${m.id===sel?"selected":""}>${esc(machineLabel(m))}</option>`).join("");
 }
@@ -723,7 +747,7 @@ function renderProdForm(){
       <div class="fields">
         ${F("اسم الجزء", `type="text" data-k="name" value="${esc(pt.name)}"`)}
         ${F("العدد في السِت", `type="number" min="0" step="1" data-k="qty" value="${pt.qty}"`, "قطعة")}
-        <div class="f"><label>المكنة</label><div class="inp"><select data-k="machine">${machineOptions(pt.machine)}</select></div></div>
+        <div class="f"><label>المكنة</label><div class="inp"><select data-k="machine">${machineOptions(pt.machine)}</select></div><small><button type="button" class="linkbtn" data-goview="machines">ضيف أو عدّل المكن</button></small></div>
         ${F("وزن القطعة", `type="number" min="0" step="any" data-k="weight" value="${pt.weight}"`, "جرام", "على الميزان بعد الحقن")}
         <div class="f mixbox"><label>الخامة</label>
           ${(pt.mix || []).length ? pt.mix.map((x,j) => `<div class="mixrow" data-j="${j}">
@@ -796,7 +820,7 @@ function renderProdResult(){
     const zero = pt.mix.filter(x => !num((matById(x.m) || {}).price)).map(x => (matById(x.m) || {name:"؟"}).name);
     el.innerHTML = `كيلو الخلطة بـ <b>${fmt1(matPrice(pt))}</b> ج · في كل كيلو: ${grams}`
       + (Math.abs(tot - 100) > 0.01 ? ` <span style="color:var(--warn)">· مجموع النسب ${fmt1(tot)}% مش 100%</span>` : "")
-      + (zero.length ? ` <span style="color:var(--warn)">· اكتب سعر ${zero.join(" و")} تحت في «الخامات وأسعارها»</span>` : "");
+      + (zero.length ? ` <span style="color:var(--warn)">· ${zero.join(" و")} لسه مالهاش سعر. <button type="button" class="linkbtn" data-goview="materials">اكتب السعر في تاب الخامات</button></span>` : "");
   });
   $("matUse").innerHTML = Object.entries(c.kgBy).filter(([,kg]) => kg > 0).map(([id,kg]) => { const mt = matById(id);
     return `<tr><td>${id === "_manual" ? "خامة بسعر يدوي" : esc(mt ? mt.name : "؟")}</td><td>${(Math.round(kg*1000)/1000).toLocaleString("en-US")} كجم</td><td>${mt ? fmt1(kg * num(mt.price)) + " ج" : "—"}</td></tr>`; }).join("");
@@ -861,7 +885,7 @@ function refreshNumbers(){ renderProdResult(); syncCostField(); renderProfitResu
 function renderAll(){ renderTabs(); renderView(); renderProdForm(); fillProfitForm(); refreshNumbers(); }
 
 /* ---------- events ---------- */
-$("pform").addEventListener("input", e => {
+const onFormInput = e => {
   const t = e.target, p = cur(), pr = p.prod;
   const val = t.type === "number" ? (t.value === "" ? 0 : Number(t.value)) : t.value;
   const row = t.closest("[data-scope]");
@@ -885,10 +909,8 @@ $("pform").addEventListener("input", e => {
   else if (t.dataset.k === "name") { p.name = val; renderTabs(); $("name").value = val; }  // renderTabs refreshes the titles
   else if (t.dataset.k) pr[t.dataset.k] = val;
   refreshNumbers(); save();
-});
-$("pform").addEventListener("change", e => { if (e.target.matches("select")) { e.target.dispatchEvent(new Event("input", {bubbles:true})); } });
-$("pform").addEventListener("submit", e => e.preventDefault());
-$("pform").addEventListener("click", e => {
+};
+const onFormClick = e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const p = cur(), pr = p.prod, i = +b.dataset.i;
   if (b.dataset.act === "delPart") { if (pr.parts.length > 1) pr.parts.splice(i,1); }
@@ -911,7 +933,15 @@ $("pform").addEventListener("click", e => {
     state.products.forEach(q => q.prod && q.prod.parts.forEach(pt => { if (pt.machine === gone.id) pt.machine = state.machines[0].id; }));
   }
   save(); renderProdForm(); refreshNumbers();
+};
+["pform","mform","kform"].forEach(id => {
+  const f = $(id);
+  f.addEventListener("input", onFormInput);
+  f.addEventListener("change", e => { if (e.target.matches("select")) e.target.dispatchEvent(new Event("input", {bubbles:true})); });
+  f.addEventListener("submit", e => e.preventDefault());
+  f.addEventListener("click", onFormClick);
 });
+document.addEventListener("click", e => { const g = e.target.closest("[data-goview]"); if (g) { e.preventDefault(); goView(g.dataset.goview); } });
 $("addPart").addEventListener("click", () => {
   const pr = cur().prod; const last = pr.parts[pr.parts.length-1] || {};
   openParts.add(pr.parts.length);
@@ -955,7 +985,7 @@ $("form").addEventListener("input", e => {
 $("form").addEventListener("submit", e => e.preventDefault());
 $("form").addEventListener("click", e => { if (e.target.id === "goProd") { e.preventDefault(); state.view = "production"; save(); renderView(); window.scrollTo({top:0}); } });
 
-document.querySelector(".seg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; state.view = b.dataset.view; save(); renderView(); });
+document.querySelectorAll(".seg").forEach(s => s.addEventListener("click", e => { const b = e.target.closest("button[data-view]"); if (b) goView(b.dataset.view); }));
 $("tabs").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.id === "add") {
