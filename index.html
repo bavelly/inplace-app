@@ -221,6 +221,16 @@ details.part[open] > summary .caret::before{content:"▾"}
 .legend div{display:grid;grid-template-columns:12px 1fr auto auto;gap:8px;align-items:center;font-variant-numeric:tabular-nums}
 .legend i{width:10px;height:10px;border-radius:3px;display:block}
 .legend .pc{color:var(--muted);min-width:48px;text-align:left}
+.legend .legrow{display:grid;grid-template-columns:12px 1fr auto auto;gap:8px;align-items:center;font:inherit;font-variant-numeric:tabular-nums;color:inherit;background:none;border:0;border-radius:6px;padding:3px 4px;margin:0 -4px;text-align:inherit;cursor:pointer}
+.legend .legrow:hover,.legend .legrow:focus-visible{background:var(--bg)}
+.legend .legrow:hover > span:nth-child(2){text-decoration:underline;text-underline-offset:3px}
+.legend .go{color:var(--muted);font-size:15px;opacity:0;transition:opacity .15s}
+.legend .legrow:hover .go,.legend .legrow:focus-visible .go{opacity:1}
+.jumprow,.jumpbody tr{cursor:pointer}
+.jumprow:hover td,.jumpbody tr:hover td{background:var(--bg)}
+.flash{animation:flash 1.8s ease-out}
+@keyframes flash{0%,35%{box-shadow:0 0 0 4px color-mix(in srgb, var(--brass) 70%, transparent);border-radius:12px}100%{box-shadow:0 0 0 4px transparent}}
+@media (prefers-reduced-motion:reduce){.flash{animation:none;box-shadow:0 0 0 4px color-mix(in srgb, var(--brass) 70%, transparent);border-radius:12px}}
 .legend .tot{border-top:1px solid var(--line);padding-top:6px;font-weight:600}
 h2{font:700 17px var(--display);margin:0}
 .note{font-size:12.5px;color:var(--muted);margin:0}
@@ -309,20 +319,20 @@ td .pill{font-size:11.5px}
         </div>
       </div>
       <hr>
-      <fieldset>
+      <fieldset id="fsParts">
         <legend>الأجزاء اللي بتتحقن <small>دوس على أي جزء علشان تفتحه وتعدّله</small></legend>
         <div style="display:flex;gap:8px;margin-top:-4px"><button type="button" class="btn small" id="openAll">افتح كل الأجزاء</button><button type="button" class="btn small" id="closeAll">اقفلهم</button></div>
         <div class="rowlist" id="parts"></div>
         <button type="button" class="btn ghost" id="addPart">+ إضافة جزء</button>
       </fieldset>
       <hr>
-      <fieldset>
+      <fieldset id="fsAccs">
         <legend>إكسسوارات وتشطيب <small>مقابض، تلبيس، مسامير، استيكر…</small></legend>
         <div class="rowlist" id="accs"></div>
         <button type="button" class="btn ghost" id="addAcc">+ إضافة بند</button>
       </fieldset>
       <hr>
-      <fieldset>
+      <fieldset id="fsPack">
         <legend>الكرتونة والتغليف</legend>
         <div class="fields">
           <div class="f"><label for="carton">سعر علبة السِت</label><div class="inp"><input id="carton" data-k="carton" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>الكرتونة الصغيرة اللي السِت بيتباع فيها</small></div>
@@ -333,7 +343,7 @@ td .pill{font-size:11.5px}
         </div>
       </fieldset>
       <hr>
-      <fieldset>
+      <fieldset id="fsScrap">
         <legend>هالك واسطمبة ومصاريف تانية</legend>
         <div class="fields">
           <div class="f"><label for="scrap">القطع المرفوضة</label><div class="inp"><input id="scrap" data-k="scrap" type="number" min="0" max="90" step="any"><span class="u">%</span></div><small>قطع بتطلع بايظة وبتترمي</small></div>
@@ -352,6 +362,7 @@ td .pill{font-size:11.5px}
       </div>
       <div style="display:flex;flex-direction:column;gap:10px">
         <h2>التكلفة رايحة فين</h2>
+        <p class="note" style="margin-top:-6px">دوس على أي بند تروح لتفاصيله.</p>
         <div class="bar" id="pbar" role="img" aria-label="تقسيم تكلفة الإنتاج"></div>
         <div class="legend" id="plegend"></div>
       </div>
@@ -361,7 +372,7 @@ td .pill{font-size:11.5px}
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">
         <h2>الخامة اللي بيسحبها السِت</h2>
-        <table class="mini"><thead><tr><th>الخامة</th><th>الكمية</th><th>التكلفة</th></tr></thead><tbody id="matUse"></tbody></table>
+        <table class="mini"><thead><tr><th>الخامة</th><th>الكمية</th><th>التكلفة</th></tr></thead><tbody id="matUse" class="jumpbody" title="دوس تروح لتاب الخامات"></tbody></table>
         <p class="note">شاملة هالك المصبات والقطع المرفوضة. اضربها في عدد الأطقم علشان تعرف تشتري كام.</p>
       </div>
       <label class="link"><input type="checkbox" id="useProd"><span>استخدم تكلفة الإنتاج دي كتكلفة المنتج في حساب الربح</span></label>
@@ -416,7 +427,7 @@ td .pill{font-size:11.5px}
         </div>
       </div>
       <hr>
-      <fieldset>
+      <fieldset id="fsPrice">
         <legend>المنتج والسعر</legend>
         <div class="fields">
           <div class="f"><label for="cost">تكلفة المنتج</label><div class="inp"><input id="cost" type="number" min="0" step="any"><span class="u">جنيه</span></div><small id="costNote">تمن السِت (من المصنع أو المورد)</small></div>
@@ -426,7 +437,7 @@ td .pill{font-size:11.5px}
         </div>
       </fieldset>
       <hr>
-      <fieldset>
+      <fieldset id="fsShip">
         <legend>الشحن والتوصيل</legend>
         <div class="fields">
           <div class="f"><label for="shipOut">الشحن اللي بتدفعه</label><div class="inp"><input id="shipOut" type="number" min="0" step="any"><span class="u">جنيه / أوردر</span></div><small>لشركة الشحن</small></div>
@@ -436,7 +447,7 @@ td .pill{font-size:11.5px}
         </div>
       </fieldset>
       <hr>
-      <fieldset>
+      <fieldset id="fsFees">
         <legend>العمولات</legend>
         <div class="fields">
           <div class="f"><label for="payPct">عمولة التحصيل / الدفع</label><div class="inp"><input id="payPct" type="number" min="0" step="any"><span class="u">% من الأوردر</span></div></div>
@@ -445,7 +456,7 @@ td .pill{font-size:11.5px}
         </div>
       </fieldset>
       <hr>
-      <fieldset>
+      <fieldset id="fsAds">
         <legend>الإعلانات والمصاريف الشهرية</legend>
         <div class="fields">
           <div class="f"><label for="cpa">صرف الإعلانات للأوردر</label><div class="inp"><input id="cpa" type="number" min="0" step="any"><span class="u">جنيه</span></div><small>CPA: صرف الإعلانات ÷ عدد الأوردرات</small></div>
@@ -472,6 +483,7 @@ td .pill{font-size:11.5px}
       </div>
       <div style="display:flex;flex-direction:column;gap:10px">
         <h2>فلوس الأوردر رايحة فين</h2>
+        <p class="note" style="margin-top:-6px">دوس على أي بند تروح لتفاصيله.</p>
         <div class="bar" id="bar" role="img" aria-label="تقسيم تكلفة الأوردر"></div>
         <div class="legend" id="legend"></div>
         <p class="note">لكل أوردر بيتسلم. الإعلانات وشحن المرتجع والمصاريف الشهرية متوزعة على الأوردرات اللي اتسلمت فعلاً.</p>
@@ -685,8 +697,8 @@ function prodCalc(p){
   const other = num(pr.otherSet);
   const total = material + elec + labor + extra + accs + pack + mold + other;
   return {rows, total, kgBy, setsPerHour: isFinite(setsPerHour) ? setsPerHour : 0, moldTotal,
-    parts:[["الخامة",material,"--seg1"],["كهربا المكنة",elec,"--seg3"],["عمالة",labor,"--seg2"],["صيانة وإهلاك",extra,"--seg7"],
-           ["إكسسوارات وتشطيب",accs,"--seg8"],["كرتونة وتغليف",pack,"--seg4"],["الاسطمبة",mold,"--seg6"],["مصاريف تانية",other,"--seg5"]]};
+    parts:[["الخامة",material,"--seg1","fsParts"],["كهربا المكنة",elec,"--seg3","fsParts"],["عمالة",labor,"--seg2","fsParts"],["صيانة وإهلاك",extra,"--seg7","fsParts"],
+           ["إكسسوارات وتشطيب",accs,"--seg8","fsAccs"],["كرتونة وتغليف",pack,"--seg4","fsPack"],["الاسطمبة",mold,"--seg6","fsScrap"],["مصاريف تانية",other,"--seg5","fsScrap"]]};
 }
 const effCost = p => p.useProd && p.prod ? prodCalc(p).total : num(p.cost);
 
@@ -710,8 +722,8 @@ function calc(p){
   const delivered = Math.max(1, v("orders")) * (1 - r);
   return {cost, revenue, totalCost, profit, margin, beCpa:(profit + ads) * (1 - r),
     bePrice: priceFor(0), sugPrice: priceFor(v("target")/100), target: v("target"), delivered, monthProfit: profit * delivered,
-    parts:[["تكلفة المنتج",cost,"--seg1"],["تغليف الشحن",v("pack"),"--seg4"],["الشحن",v("shipOut"),"--seg3"],["العمولات",fees,"--seg2"],
-           ["الإعلانات",ads,"--seg5"],["المرتجعات",refusal,"--seg6"],["المصاريف الشهرية",overhead,"--seg7"]]};
+    parts:[["تكلفة المنتج",cost,"--seg1","fsPrice"],["تغليف الشحن",v("pack"),"--seg4","fsPrice"],["الشحن",v("shipOut"),"--seg3","fsShip"],["العمولات",fees,"--seg2","fsFees"],
+           ["الإعلانات",ads,"--seg5","fsAds"],["المرتجعات",refusal,"--seg6","fsShip"],["المصاريف الشهرية",overhead,"--seg7","fsAds"]]};
 }
 function status(c){
   if (c.profit < 0) return ["bad", "بتخسر في كل أوردر"];
@@ -727,8 +739,27 @@ function barHTML(parts, extra, base){
   return parts.map(([l,v,c]) => `<span title="${l}" style="width:${Math.max(0,v)/base*100}%;background:var(${c})"></span>`).join("") + (extra||"");
 }
 function legendHTML(parts, base){
-  return parts.filter(([,v]) => v > 0.005).map(([l,v,c]) => `<div><i style="background:var(${c})"></i><span>${l}</span><span>${fmt1(v)}</span><span class="pc">${pct(base ? v/base*100 : NaN)}</span></div>`).join("");
+  return parts.filter(([,v]) => v > 0.005).map(([l,v,c,go]) => `<button type="button" class="legrow" data-jump="${go || ""}" title="دوس تشوف تفاصيل ${l}"><i style="background:var(${c})"></i><span>${l} <span class="go" aria-hidden="true">‹</span></span><span>${fmt1(v)}</span><span class="pc">${pct(base ? v/base*100 : NaN)}</span></button>`).join("");
 }
+/* Jump from a cost line to the section of the form it comes from, and flash it. */
+function jumpTo(id, partIndex){
+  const el = $(id); if (!el) return;
+  const inProfit = !!el.closest("#viewProfit");
+  if ((inProfit && state.view !== "profit") || (!inProfit && state.view !== "production")) { state.view = inProfit ? "profit" : "production"; save(); renderView(); }
+  if (id === "fsParts") {
+    if (partIndex != null) openParts.add(partIndex); else cur().prod.parts.forEach((_,i) => openParts.add(i));
+    renderProdForm(); refreshNumbers();
+  }
+  const target = partIndex != null ? document.querySelector(`details.part[data-i="${partIndex}"]`) : $(id);
+  target.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"});
+  target.classList.remove("flash"); void target.offsetWidth; target.classList.add("flash");
+  setTimeout(() => target.classList.remove("flash"), 1800);
+}
+document.addEventListener("click", e => {
+  const j = e.target.closest("[data-jump]"); if (j && j.dataset.jump) { jumpTo(j.dataset.jump); return; }
+  const pr = e.target.closest("[data-jump-part]"); if (pr) jumpTo("fsParts", +pr.dataset.jumpPart);
+  const mu = e.target.closest("#matUse tr"); if (mu) goView("materials");
+});
 function renderTabs(){
   $("tabs").innerHTML = state.products.map(p =>
     `<button type="button" class="tab" role="tab" aria-selected="${p.id===state.cur}" data-id="${p.id}">${thumbHTML(p)}<span>${esc(p.name||"بدون اسم")}</span></button>`
@@ -832,7 +863,7 @@ function renderProdResult(){
   $("capacity").textContent = c.setsPerHour ? `أبطأ جزء بيطلع حوالي ${fmt(c.setsPerHour)} سِت في الساعة · ${fmt(c.setsPerHour*8)} في وردية ٨ ساعات` : "كمّل بيانات الأجزاء";
   $("pbar").innerHTML = barHTML(c.parts, "", c.total);
   $("plegend").innerHTML = legendHTML(c.parts, c.total) + `<div class="tot"><i style="background:var(--ink)"></i><span>إجمالي السِت</span><span>${fmt1(c.total)}</span><span class="pc">100%</span></div>`;
-  $("partRows").innerHTML = c.rows.map((r,i) => `<tr><td style="color:${partColor(i)};font-weight:600"><i class="dot" style="background:${partColor(i)}"></i>${esc(r.name)}</td><td>${fmt1(r.mat)}</td><td>${fmt1(r.mach)}</td><td><b>${fmt1(r.piece)}</b></td><td>${fmt(r.good)}</td></tr>`).join("");
+  $("partRows").innerHTML = c.rows.map((r,i) => `<tr class="jumprow" data-jump-part="${i}" title="دوس تفتح الجزء ده"><td style="color:${partColor(i)};font-weight:600"><i class="dot" style="background:${partColor(i)}"></i>${esc(r.name)}</td><td>${fmt1(r.mat)}</td><td>${fmt1(r.mach)}</td><td><b>${fmt1(r.piece)}</b></td><td>${fmt(r.good)}</td></tr>`).join("");
   cur().prod.parts.forEach((pt,i) => {
     const el = document.querySelector(`[data-mixout="part-${i}"]`); if (!el) return;
     const d = dyeShare(pt), dyeM = matById(DYE_ID) || {name:"صبغة", price:0};
