@@ -92,6 +92,18 @@ hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 .rowlist{display:flex;flex-direction:column;gap:8px}
 .filebar{display:contents}
 #reportHost{position:fixed;left:-20000px;top:0;width:1060px}
+.overlay{position:fixed;inset:0;background:rgba(10,12,15,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+.overlay[hidden]{display:none !important}
+.picker{width:min(520px,100%);max-height:calc(100% - 32px);overflow:auto;display:flex;flex-direction:column;gap:10px}
+.pick-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:4px}
+.pick-h b{font:600 14px var(--display)}
+.picklist{display:flex;flex-direction:column;gap:6px}
+.pick{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:14px}
+.pick:has(input:checked){border-color:var(--brass);background:var(--brass-soft)}
+.pick input{width:17px;height:17px;accent-color:var(--brass);flex:none}
+.pick img,.pick .ph{width:28px;height:28px;border-radius:6px;object-fit:cover;flex:none;background:var(--brass-soft);display:grid;place-items:center;color:var(--brass);font-weight:600}
+.pick-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
 .rep{background:#fff;color:#16191d;font:12.5px/1.5 var(--body);padding:28px 30px;direction:rtl}
 .rep h1{font:700 22px var(--display);margin:0 0 2px}
 .rep h1 span{color:#a87a1c}
@@ -111,6 +123,7 @@ hr{border:0;border-top:1px solid var(--line);margin:4px 0}
   @page{size:A4 landscape;margin:10mm}
   body{background:#fff}
   body > *:not(#reportHost){display:none !important}
+  #pdfPicker{display:none !important}
   #reportHost{position:static;width:auto}
   .rep{padding:0}
 }
@@ -175,6 +188,17 @@ td .pill{font-size:11.5px}
 </head>
 <body>
 <div id="reportHost" aria-hidden="true"></div>
+<div id="pdfPicker" class="overlay" hidden>
+  <div class="panel picker" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
+    <h2 id="pickTitle">تصدير PDF</h2>
+    <div class="pick-h"><b>المنتجات</b><span><button type="button" class="linkbtn" id="pickAll">الكل</button> · <button type="button" class="linkbtn" id="pickNone">ولا حاجة</button></span></div>
+    <div class="picklist" id="pickProducts"></div>
+    <div class="pick-h"><b>يطلع في التقرير</b></div>
+    <div class="picklist" id="pickSections"></div>
+    <div class="pick-foot"><span class="note" id="pickCount"></span>
+      <span style="display:flex;gap:8px"><button type="button" class="btn" id="pickCancel">إلغاء</button><button type="button" class="btn primary" id="pickGo">طلّع PDF</button></span></div>
+  </div>
+</div>
 <div class="wrap">
   <header>
     <div>
@@ -868,33 +892,44 @@ if (FILE_MODE) {
   }));
   const money = n => isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—";
   const cls = n => n < 0 ? "neg" : "";
-  function reportHTML(){
+  const ALL_SECTIONS = {summary:true, detail:true, parts:true, machines:true};
+  function reportHTML(sel = {}){
+    const ids = sel.ids || state.products.map(p => p.id), sec = sel.sections || ALL_SECTIONS;
+    const prods = state.products.filter(p => ids.includes(p.id));
+    const usedM = new Set(prods.flatMap(p => (p.prod ? p.prod.parts : []).map(pt => pt.machine)));
+    const machs = state.machines.filter(m => usedM.has(m.id));
+    let started = false;
     const today = new Date().toLocaleDateString("ar-EG", {dateStyle:"long"});
     let h = `<div class="rep"><h1><span>inplace</span> · تقرير التكاليف والربح</h1>
       <p class="meta">${today} · الكيلووات ساعة ${num(state.g.kwh)} ج · مرتب العامل ${money(state.g.wage)} ج / ${num(state.g.hours)} ساعة · كل الأرقام بالجنيه</p>
-      <h2>ملخص المنتجات</h2><table><thead><tr><th>المنتج</th><th>تكلفة الإنتاج للسِت</th><th>سعر البيع</th><th>إجمالي التكلفة للأوردر</th><th>الربح للأوردر</th><th>نسبة الربح</th><th>أقصى صرف إعلانات للأوردر</th><th>السعر لنسبة الربح المطلوبة</th></tr></thead><tbody>`;
-    state.products.forEach(p => { const c = calc(p);
+      ${prods.length === 1 ? `<p class="meta" style="font:600 15px var(--display);color:#16191d">${esc(prods[0].name)}</p>` : ""}`;
+    if (sec.summary) { started = true; h += `<h2>ملخص المنتجات</h2><table><thead><tr><th>المنتج</th><th>تكلفة الإنتاج للسِت</th><th>سعر البيع</th><th>إجمالي التكلفة للأوردر</th><th>الربح للأوردر</th><th>نسبة الربح</th><th>أقصى صرف إعلانات للأوردر</th><th>السعر لنسبة الربح المطلوبة</th></tr></thead><tbody>`;
+    prods.forEach(p => { const c = calc(p);
       h += `<tr><td>${esc(p.name)}</td><td class="n">${money(c.cost)}</td><td class="n">${money(p.price)}</td><td class="n">${money(c.totalCost)}</td>
         <td class="n ${c.profit<0?"neg":"pos"}">${money(c.profit)}</td><td class="n ${cls(c.margin)}">${pct(c.margin)}</td><td class="n">${money(c.beCpa)}</td><td class="n">${money(c.sugPrice)}</td></tr>`; });
-    h += `</tbody></table><h2>تفاصيل تكلفة إنتاج السِت</h2><table><thead><tr><th>المنتج</th>`;
-    const cats = prodCalc(state.products[0]).parts.map(x => x[0]);
+    h += `</tbody></table>`; }
+    if (sec.detail) { started = true; h += `<h2>تفاصيل تكلفة إنتاج السِت</h2><table><thead><tr><th>المنتج</th>`;
+    const cats = prodCalc(prods[0]).parts.map(x => x[0]);
     cats.forEach(cn => h += `<th>${cn}</th>`); h += `<th>الإجمالي</th><th>سِت في الساعة</th></tr></thead><tbody>`;
-    state.products.forEach(p => { const pc = prodCalc(p);
+    prods.forEach(p => { const pc = prodCalc(p);
       h += `<tr><td>${esc(p.name)}</td>${pc.parts.map(x => `<td class="n">${fmt1(x[1])}</td>`).join("")}<td class="n"><b>${fmt1(pc.total)}</b></td><td class="n">${fmt(pc.setsPerHour)}</td></tr>`; });
-    h += `</tbody></table><div class="pb"></div><h2>الأجزاء</h2><table><thead><tr><th>المنتج</th><th>الجزء</th><th>العدد</th><th>المكنة</th><th>الوزن (جم)</th><th>الخامة (ج/كجم)</th><th>الدورة (ث)</th><th>العيون</th><th>قطعة/ساعة</th><th>كهربا القطعة (ك.و.س)</th><th>خامة القطعة</th><th>مكنة القطعة</th><th>تكلفة القطعة</th></tr></thead><tbody>`;
-    state.products.forEach(p => { const pc = prodCalc(p);
+    h += `</tbody></table>`; }
+    if (sec.parts) { h += `${started ? '<div class="pb"></div>' : ""}<h2>الأجزاء</h2><table><thead><tr><th>المنتج</th><th>الجزء</th><th>العدد</th><th>المكنة</th><th>الوزن (جم)</th><th>الخامة (ج/كجم)</th><th>الدورة (ث)</th><th>العيون</th><th>قطعة/ساعة</th><th>كهربا القطعة (ك.و.س)</th><th>خامة القطعة</th><th>مكنة القطعة</th><th>تكلفة القطعة</th></tr></thead><tbody>`;
+    prods.forEach(p => { const pc = prodCalc(p);
       p.prod.parts.forEach((pt,i) => { const r = pc.rows[i]; const m = state.machines.find(x => x.id === pt.machine) || {};
         h += `<tr><td>${esc(p.name)}</td><td>${esc(pt.name)}</td><td class="n">${num(pt.qty)}</td><td>${esc(machineLabel(m))}</td><td class="n">${num(pt.weight)}</td><td class="n">${num(pt.mat)}</td><td class="n">${num(pt.cycle)}</td><td class="n">${num(pt.cav)}</td><td class="n">${fmt(r.good)}</td><td class="n">${isFinite(r.kwhPiece)?(Math.round(r.kwhPiece*1000)/1000):"—"}</td><td class="n">${fmt1(r.mat)}</td><td class="n">${fmt1(r.mach)}</td><td class="n"><b>${fmt1(r.piece)}</b></td></tr>`; }); });
-    h += `</tbody></table><h2>المكن</h2><table><thead><tr><th>المكنة</th><th>نوع الطلمبة</th><th>الموتور (ك.و)</th><th>السخانات (ك.و)</th><th>كهربا في الساعة (ك.و.س)</th><th>تكلفة الكهربا / ساعة</th><th>عمالة / ساعة</th><th>صيانة وإهلاك / ساعة</th><th>الساعة كلها</th></tr></thead><tbody>`;
-    state.machines.forEach(m => { const r = machineRate(m);
+    h += `</tbody></table>`; }
+    if (sec.machines && machs.length) { h += `<h2>المكن</h2><table><thead><tr><th>المكنة</th><th>نوع الطلمبة</th><th>الموتور (ك.و)</th><th>السخانات (ك.و)</th><th>كهربا في الساعة (ك.و.س)</th><th>تكلفة الكهربا / ساعة</th><th>عمالة / ساعة</th><th>صيانة وإهلاك / ساعة</th><th>الساعة كلها</th></tr></thead><tbody>`;
+    machs.forEach(m => { const r = machineRate(m);
       h += `<tr><td>${esc(machineLabel(m))}</td><td>${m.drive === "fixed" ? "طلمبة ثابتة" : "سيرفو"}</td><td class="n">${num(m.motorKw)}</td><td class="n">${num(m.heaterKw)}</td><td class="n">${fmt1(r.kwhPerHour)}</td><td class="n">${fmt1(r.elec)}</td><td class="n">${fmt1(r.labor)}</td><td class="n">${fmt1(r.extra)}</td><td class="n"><b>${fmt1(r.total)}</b></td></tr>`; });
-    h += `</tbody></table><p class="foot">الكهربا محسوبة تقديرياً من قدرة الموتور والسخانات (السيرفو حوالي ٤٠٪ من قدرة الموتور، الطلمبة الثابتة حوالي ٧٥٪، السخانات حوالي ٤٠٪). الضرايب والقيمة المضافة مش محسوبة.</p></div>`;
+    h += `</tbody></table>`; }
+    h += `<p class="foot">الكهربا محسوبة تقديرياً من قدرة الموتور والسخانات (السيرفو حوالي ٤٠٪ من قدرة الموتور، الطلمبة الثابتة حوالي ٧٥٪، السخانات حوالي ٤٠٪). الضرايب والقيمة المضافة مش محسوبة.</p></div>`;
     return h;
   }
-  const pdfOpts = () => ({margin:[8,8,8,8], filename:`inplace-cost-report-${stamp()}.pdf`, image:{type:"jpeg", quality:0.95},
+  const pdfOpts = (name) => ({margin:[8,8,8,8], filename:`inplace-cost-report-${name ? name + "-" : ""}${stamp()}.pdf`, image:{type:"jpeg", quality:0.95},
     html2canvas:{scale:2, backgroundColor:"#ffffff"}, jsPDF:{unit:"mm", format:"a4", orientation:"landscape"}, pagebreak:{mode:["css","legacy"], avoid:"tr"}});
-  async function makePdf(kind){
-    const host = $("reportHost"); host.innerHTML = reportHTML();
+  async function makePdf(kind, sel = {}){
+    const host = $("reportHost"); host.innerHTML = reportHTML(sel);
     // html2canvas drops some spaces between Arabic words: give each word its own span so layout keeps the gaps.
     const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT); const nodes = [];
     while (walker.nextNode()) if (/\S\s+\S/.test(walker.currentNode.nodeValue)) nodes.push(walker.currentNode);
@@ -904,14 +939,39 @@ if (FILE_MODE) {
         else { const s = document.createElement("span"); s.textContent = part; frag.appendChild(s); } });
       n.parentNode.replaceChild(frag, n); });
     const lib = await loadPdfLib();
-    const w = lib().set(pdfOpts()).from(host.firstElementChild);
+    const w = lib().set(pdfOpts(sel.fileName)).from(host.firstElementChild);
     return kind === "save" ? w.save() : w.outputPdf("datauristring");
   }
-  $("exportPdf").addEventListener("click", async () => {
-    const b = $("exportPdf"); b.disabled = true; b.textContent = "بيجهّز الـ PDF…";
-    try { await makePdf("save"); }
-    catch(e) { $("reportHost").innerHTML = reportHTML(); window.print(); }  // offline: choose "Save as PDF" in the print window
-    b.disabled = false; b.textContent = "تصدير PDF";
+  /* PDF picker: choose which products and which parts of the report go in */
+  const picker = $("pdfPicker");
+  const SECTION_LABELS = {summary:"ملخص الربح والتسعير", detail:"تفاصيل تكلفة الإنتاج", parts:"الأجزاء (الوزن، الدورة، الكهربا، تكلفة القطعة)", machines:"المكن المستخدمة"};
+  function openPicker(){
+    $("pickProducts").innerHTML = state.products.map(p => `<label class="pick"><input type="checkbox" value="${p.id}" ${p.id === state.cur ? "checked" : ""}>${thumbHTML(p)}<span>${esc(p.name || "بدون اسم")}</span></label>`).join("");
+    $("pickSections").innerHTML = Object.entries(SECTION_LABELS).map(([k,v]) => `<label class="pick"><input type="checkbox" value="${k}" checked><span>${v}</span></label>`).join("");
+    picker.hidden = false; updatePick(); $("pickGo").focus();
+  }
+  const closePicker = () => { picker.hidden = true; $("exportPdf").focus(); };
+  const picked = box => [...$(box).querySelectorAll("input:checked")].map(x => x.value);
+  function updatePick(){
+    const n = picked("pickProducts").length, s = picked("pickSections").length;
+    $("pickGo").disabled = !n || !s;
+    $("pickCount").textContent = !n ? "اختار منتج واحد على الأقل" : !s ? "اختار جزء واحد على الأقل من التقرير" : `هيطلع ${n} ${n === 1 ? "منتج" : "منتجات"}`;
+  }
+  picker.addEventListener("change", updatePick);
+  $("pickAll").addEventListener("click", () => { $("pickProducts").querySelectorAll("input").forEach(x => x.checked = true); updatePick(); });
+  $("pickNone").addEventListener("click", () => { $("pickProducts").querySelectorAll("input").forEach(x => x.checked = false); updatePick(); });
+  $("pickCancel").addEventListener("click", closePicker);
+  picker.addEventListener("click", e => { if (e.target === picker) closePicker(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !picker.hidden) closePicker(); });
+  $("exportPdf").addEventListener("click", openPicker);
+  $("pickGo").addEventListener("click", async () => {
+    const ids = picked("pickProducts"), secs = picked("pickSections");
+    const sel = {ids, sections: Object.fromEntries(Object.keys(SECTION_LABELS).map(k => [k, secs.includes(k)]))};
+    if (ids.length === 1) { const p = state.products.find(x => x.id === ids[0]); sel.fileName = (p.name || "").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 40); }
+    const b = $("pickGo"); b.disabled = true; b.textContent = "بيجهّز الـ PDF…";
+    try { await makePdf("save", sel); }
+    catch(e) { $("reportHost").innerHTML = reportHTML(sel); window.print(); }  // offline: choose "Save as PDF" in the print window
+    b.disabled = false; b.textContent = "طلّع PDF"; closePicker();
   });
 
   /* ----- GitHub sync: load and save data/inplace-data.json, upload the day's report ----- */
