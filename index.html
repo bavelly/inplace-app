@@ -124,6 +124,10 @@ body.locked .grid, body.locked .seg, body.locked #tabs, body.locked .wrap > sect
 #reset{display:none !important}
 body.locked #lockNote{display:block}
 #ghStatus.ok{color:var(--good)} #ghStatus.err{color:var(--bad)} #ghStatus.warn{color:var(--warn)}
+.autoline{margin:0;font-size:14px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-variant-numeric:tabular-nums}
+.autoline b{font-weight:700}
+.autoline span{color:var(--muted);font-size:12.5px}
+.linkbtn{border:0;background:none;padding:0;color:var(--brass);font:inherit;text-decoration:underline;cursor:pointer}
 .warnline{margin:0;font-size:13px;color:var(--warn);background:var(--warn-bg);border-radius:8px;padding:6px 10px}
 .acc{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:end}
 @media (max-width:520px){.acc{grid-template-columns:1fr 1fr}.acc .f:first-child{grid-column:1/-1}}
@@ -262,7 +266,7 @@ td .pill{font-size:11.5px}
         <button type="button" class="btn ghost" id="addMachine">+ إضافة مكنة</button>
         <div class="card">
           <b style="font:600 15px var(--display)">ضيف كذا مكنة مرة واحدة</b>
-          <p class="note">اكتب كل مكنة في سطر: الطن والماركة (هيتيان، سونلي، حوامده). لو عندك أكتر من واحدة من نفس النوع اكتب العدد، زي «3 × 250 هيتيان». القدرات بتتملي من الكتالوج، وتقدر تعدّلها بعدين من لوحة المكنة.</p>
+          <p class="note">اكتب كل مكنة في سطر: الطن والماركة (هيتيان، سونلي، حوامده). لو عندك أكتر من واحدة من نفس النوع اكتب العدد، زي «3 × 250 هيتيان». الكيلووات وأقصى حقنة بيتحسبوا أوتوماتيك.</p>
           <div class="inp"><textarea id="bulkText" rows="4" style="flex:1;border:0;background:transparent;color:var(--ink);font:500 15px var(--body);padding:8px 10px;resize:vertical;outline:none" placeholder="120 هيتيان&#10;3 × 250 هيتيان&#10;438 سونلي&#10;1300 هيتيان"></textarea></div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn" id="bulkAdd">ضيف المكن دي</button><span class="note" id="bulkNote"></span></div>
         </div>
@@ -421,6 +425,7 @@ function catalogSpec(brand, tons){
     src: brand === "haitian" ? `تقدير بين موديلات Haitian لمكنة ${T} طن` : `تقدير من كتالوج Haitian لمكنة ${T} طن`};
 }
 function fillFromCatalog(m){ const s = catalogSpec(m.brand, m.tons); if (s) Object.assign(m, s); return m; }
+const autoLine = m => `الموتور <b>${num(m.motorKw)}</b> ك.و · السخانات <b>${num(m.heaterKw)}</b> ك.و · أقصى حقنة <b>${fmt(num(m.shotG))}</b> جم <span>(${esc(m.src || "")})</span>`;
 const machineLabel = m => `${m.brand && m.brand !== "other" ? BRANDS[m.brand] + " " : ""}${num(m.tons)} طن`;
 function normalizeMachines(st){
   (st.machines || []).forEach(m => {
@@ -430,6 +435,8 @@ function normalizeMachines(st){
     // First rough guesses for the three Hwamda machines: swap in catalog figures unless someone already typed the nameplate.
     const guess = {h108:[11,7,160], h170:[15,9.8,252], h268:[30,15,716]}[m.id];
     if (guess && !m.src && m.motorKw === guess[0] && m.heaterKw === guess[1] && m.shotG === guess[2]) fillFromCatalog(m);
+    if (m.auto == null) m.auto = !!m.src;   // catalog-filled machines stay automatic; nameplate-typed ones stay manual
+    if (m.auto) fillFromCatalog(m);
   });
   return st;
 }
@@ -610,9 +617,10 @@ function renderProdForm(){
   $("machines").innerHTML = state.machines.map((m,i) => `
     <div class="card" data-scope="machine" data-i="${i}">
       <div class="card-h"><b>${esc(machineLabel(m))}</b><span class="chip" data-out="mach-${i}"></span>
-        <span style="display:flex;gap:6px"><button type="button" class="btn small" data-act="fillMachine" data-i="${i}">املا من الكتالوج</button>
-        <button type="button" class="btn small" data-act="delMachine" data-i="${i}">حذف</button></span></div>
-      <p class="note" data-src="mach-${i}">${m.src ? "القدرات: " + esc(m.src) : "القدرات: مكتوبة يدوي (من لوحة المكنة)"}</p>
+        <button type="button" class="btn small" data-act="delMachine" data-i="${i}">حذف</button></div>
+      ${m.auto !== false ? `<p class="autoline" data-src="mach-${i}">${autoLine(m)}</p>
+        <p class="note">محسوبة أوتوماتيك من الماركة والطن. <button type="button" class="linkbtn" data-act="manualMachine" data-i="${i}">عندي أرقام اللوحة؟ اكتبها بإيدك</button></p>`
+      : `<p class="note" data-src="mach-${i}">القدرات مكتوبة يدوي (من لوحة المكنة). <button type="button" class="linkbtn" data-act="autoMachine" data-i="${i}">رجّعها أوتوماتيك</button></p>`}
       <div class="fields">
         <div class="f"><label>الماركة</label><div class="inp"><select data-k="brand">
           ${Object.entries(BRANDS).map(([k,v]) => `<option value="${k}" ${m.brand===k?"selected":""}>${v}</option>`).join("")}</select></div></div>
@@ -620,9 +628,9 @@ function renderProdForm(){
         <div class="f"><label>نوع الطلمبة</label><div class="inp"><select data-k="drive">
           <option value="servo" ${m.drive!=="fixed"?"selected":""}>سيرفو (موفّرة)</option>
           <option value="fixed" ${m.drive==="fixed"?"selected":""}>طلمبة ثابتة (قديمة)</option></select></div><small>السيرفو بيهدى وقت التبريد</small></div>
-        ${F("قدرة الموتور", `type="number" min="0" step="any" data-k="motorKw" value="${m.motorKw}"`, "كيلووات", "Pump motor power على لوحة المكنة")}
+        ${m.auto === false ? `${F("قدرة الموتور", `type="number" min="0" step="any" data-k="motorKw" value="${m.motorKw}"`, "كيلووات", "Pump motor power على لوحة المكنة")}
         ${F("قدرة السخانات", `type="number" min="0" step="any" data-k="heaterKw" value="${m.heaterKw}"`, "كيلووات", "Heater power على لوحة المكنة")}
-        ${F("أقصى وزن حقنة", `type="number" min="0" step="any" data-k="shotG" value="${m.shotG}"`, "جرام", "Shot weight (PS)، ٠ لو مش عارف")}
+        ${F("أقصى وزن حقنة", `type="number" min="0" step="any" data-k="shotG" value="${m.shotG}"`, "جرام", "Shot weight (PS)، ٠ لو مش عارف")}` : ""}
         ${F("عمال على المكنة", `type="number" min="0" step="any" data-k="workers" value="${m.workers}"`, "عامل")}
         ${F("صيانة وإهلاك وإيجار", `type="number" min="0" step="any" data-k="extra" value="${m.extra}"`, "جنيه / ساعة")}
       </div>
@@ -702,10 +710,8 @@ $("pform").addEventListener("input", e => {
     else if (row.dataset.scope === "acc") pr.accs[i][k] = val;
     else if (row.dataset.scope === "machine") {
       const m = state.machines[i]; m[k] = val;
-      if (["motorKw","heaterKw","shotG"].includes(k)) { m.src = ""; row.querySelector("[data-src]").textContent = "القدرات: مكتوبة يدوي (من لوحة المكنة)"; }
       if (k === "brand" || k === "tons") {
-        if (m.src) { fillFromCatalog(m); ["motorKw","heaterKw","shotG"].forEach(x => { const el = row.querySelector(`[data-k="${x}"]`); if (el) el.value = m[x]; });
-          row.querySelector("[data-src]").textContent = "القدرات: " + m.src; }
+        if (m.auto !== false) { fillFromCatalog(m); row.querySelector("[data-src]").innerHTML = autoLine(m); }
         row.querySelector(".card-h b").textContent = machineLabel(m);
         document.querySelectorAll('select[data-k="machine"]').forEach(s => { const v = s.value; s.innerHTML = machineOptions(v); }); }
     }
@@ -721,7 +727,8 @@ $("pform").addEventListener("click", e => {
   const p = cur(), pr = p.prod, i = +b.dataset.i;
   if (b.dataset.act === "delPart") { if (pr.parts.length > 1) pr.parts.splice(i,1); }
   if (b.dataset.act === "delAcc") pr.accs.splice(i,1);
-  if (b.dataset.act === "fillMachine") fillFromCatalog(state.machines[i]);
+  if (b.dataset.act === "manualMachine") state.machines[i].auto = false;
+  if (b.dataset.act === "autoMachine") { state.machines[i].auto = true; fillFromCatalog(state.machines[i]); }
   if (b.dataset.act === "delMachine") {
     if (state.machines.length < 2) return;
     const gone = state.machines.splice(i,1)[0];
@@ -735,7 +742,7 @@ $("addPart").addEventListener("click", () => {
   save(); renderProdForm(); refreshNumbers();
 });
 $("addAcc").addEventListener("click", () => { cur().prod.accs.push({name:"بند جديد", price:0, qty:1}); save(); renderProdForm(); refreshNumbers(); });
-const newMachine = (brand, tons) => fillFromCatalog({id:uid("m"), brand, tons, drive:"servo", workers:1, extra: Math.round(10 + num(tons) * 0.15), src:"x"});
+const newMachine = (brand, tons) => fillFromCatalog({id:uid("m"), brand, tons, auto:true, drive:"servo", workers:1, extra: Math.round(10 + num(tons) * 0.15), src:""});
 $("addMachine").addEventListener("click", () => { state.machines.push(newMachine("haitian", 250)); save(); renderProdForm(); refreshNumbers(); });
 function parseMachineList(text){
   const out = [];
