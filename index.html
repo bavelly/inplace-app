@@ -148,6 +148,17 @@ body.locked .grid, body.locked .seg, body.locked .settings-view, body.locked #ta
 #lockNote{display:none}
 #reset{display:none !important}
 body.locked #lockNote{display:block}
+#ghLive[hidden]{display:none !important}
+.ghdot{font:600 12.5px var(--body);border-radius:999px;padding:4px 10px 4px 12px;white-space:nowrap}
+.ghdot::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-inline-end:6px;vertical-align:middle}
+.ghdot.ok{background:var(--good-bg);color:var(--good)} .ghdot.busy{background:var(--warn-bg);color:var(--warn)} .ghdot.err{background:var(--bad-bg);color:var(--bad)}
+.gh-who{min-width:180px;flex:0 1 240px}
+.ghlog summary{cursor:pointer;font-size:13.5px;color:var(--steel);font-weight:600}
+.ghlog ul{margin:6px 0 0;padding-inline-start:18px;font-size:13.5px;display:flex;flex-direction:column;gap:6px;max-height:280px;overflow:auto}
+.ghlog ul ul{gap:2px;margin-top:2px}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:60;width:min(560px,calc(100% - 32px));background:var(--ink);color:var(--surface);border-radius:12px;padding:12px 16px;box-shadow:0 8px 30px rgba(0,0,0,.25);font-size:14px;cursor:pointer}
+.toast[hidden]{display:none}
+.toast ul{margin:6px 0 0;padding-inline-start:18px}
 #ghStatus.ok{color:var(--good)} #ghStatus.err{color:var(--bad)} #ghStatus.warn{color:var(--warn)}
 .autoline{margin:0;font-size:14px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-variant-numeric:tabular-nums}
 .autoline b{font-weight:700}
@@ -254,6 +265,7 @@ td .pill{font-size:11.5px}
 </head>
 <body>
 <div id="reportHost" aria-hidden="true"></div>
+<div id="toast" class="toast" role="status" hidden></div>
 <div id="pdfPicker" class="overlay" hidden>
   <div class="panel picker" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
     <h2 id="pickTitle">تصدير PDF</h2>
@@ -290,9 +302,14 @@ td .pill{font-size:11.5px}
       <b>GitHub</b>
       <div class="inp gh-token"><input id="ghToken" type="password" autocomplete="off" placeholder="الصق التوكن هنا (github_pat_…)" aria-label="توكن GitHub"></div>
       <button class="btn" id="ghConnect" type="button">اتصل وحمّل آخر أرقام</button>
-      <button class="btn primary" id="ghSave" type="button" hidden>احفظ على GitHub وارفع تقرير</button>
+      <span id="ghLive" hidden style="display:contents">
+        <span class="ghdot ok" id="ghDot">متزامن</span>
+        <div class="inp gh-who"><input id="ghWho" type="text" placeholder="اسم الجهاز ده (مثلاً: المشتريات)" aria-label="اسم الجهاز ده"></div>
+      </span>
+      <button class="btn" id="ghSave" type="button" hidden>ارفع تقرير اليوم (PDF و Excel)</button>
       <button class="btn small" id="ghForget" type="button" hidden>افصل</button>
     </div>
+    <details class="ghlog"><summary>آخر التعديلات من الأجهزة التانية <span id="ghLogCount"></span></summary><ul id="ghLog"></ul></details>
     <p class="note" id="lockNote">الحاسبة مقفولة. الأرقام محفوظة على GitHub (private)، والصفحة دي مش بتظهر أي رقم من غير توكن.</p>
     <p class="note" id="ghStatus">التوكن بيتحفظ على المتصفح ده بس، ومش بيتبعت لأي مكان غير GitHub.</p>
   </section>
@@ -688,7 +705,7 @@ function machineRate(m){
 function prodCalc(p){
   const pr = p.prod || blankProd();
   const scrap = Math.min(num(pr.scrap), 90) / 100;
-  let material = 0, elec = 0, labor = 0, extra = 0, moldTotal = 0, setsPerHour = Infinity; const kgBy = {};
+  let material = 0, dyeCost = 0, elec = 0, labor = 0, extra = 0, moldTotal = 0, setsPerHour = Infinity; const kgBy = {};
   const rows = pr.parts.map(pt => {
     const m = state.machines.find(x => x.id === pt.machine) || state.machines[0];
     const rate = machineRate(m);
@@ -703,7 +720,7 @@ function prodCalc(p){
     const d = dyeShare(pt);
     if (tot) pt.mix.forEach(x => { kgBy[x.m] = (kgBy[x.m] || 0) + kgPiece * q * (1 - d) * num(x.pct) / tot; });
     else kgBy._manual = (kgBy._manual || 0) + kgPiece * q * (1 - d);
-    if (d) kgBy[DYE_ID] = (kgBy[DYE_ID] || 0) + kgPiece * q * d;
+    if (d) { kgBy[DYE_ID] = (kgBy[DYE_ID] || 0) + kgPiece * q * d; dyeCost += kgPiece * q * d * num((matById(DYE_ID) || {}).price); }
     if (good) { elec += rate.elec/good*q; labor += rate.labor/good*q; extra += rate.extra/good*q; }
     moldTotal += num(pt.mold);
     if (q && good) setsPerHour = Math.min(setsPerHour, good / q);
@@ -717,7 +734,7 @@ function prodCalc(p){
   const other = num(pr.otherSet);
   const total = material + elec + labor + extra + accs + pack + mold + other;
   return {rows, total, kgBy, setsPerHour: isFinite(setsPerHour) ? setsPerHour : 0, moldTotal,
-    parts:[["الخامة",material,"--seg1","fsParts"],["كهربا المكنة",elec,"--seg3","fsParts"],["عمالة",labor,"--seg2","fsParts"],["صيانة وإهلاك",extra,"--seg7","fsParts"],
+    parts:[["الخامة",material - dyeCost,"--seg1","fsParts"],["الصبغة",dyeCost,"--p6","fsParts"],["كهربا المكنة",elec,"--seg3","fsParts"],["عمالة",labor,"--seg2","fsParts"],["صيانة وإهلاك",extra,"--seg7","fsParts"],
            ["إكسسوارات وتشطيب",accs,"--seg8","fsAccs"],["كرتونة وتغليف",pack,"--seg4","fsPack"],["الاسطمبة",mold,"--seg6","fsScrap"],["مصاريف تانية",other,"--seg5","fsScrap"]]};
 }
 const effCost = p => p.useProd && p.prod ? prodCalc(p).total : num(p.cost);
@@ -1102,7 +1119,7 @@ confirmBtn($("reset"), "رجّع الأمثلة", "دوس تاني لمسح كل
 renderAll();
 
 /* ---------- newer version check: GitHub Pages lets phones keep an old copy for a while ---------- */
-const APP_VERSION = "1795270868";
+const APP_VERSION = "1795272482";
 if (/^https?:$/.test(location.protocol)) {
   fetch(location.pathname + "?check=" + Date.now(), {cache: "no-store"}).then(r => r.ok ? r.text() : "").then(html => {
     const m = html.match(/const APP_VERSION = "(\d+)"/);
@@ -1261,100 +1278,273 @@ if (FILE_MODE) {
     b.disabled = false; b.textContent = "طلّع PDF"; closePicker();
   });
 
-  /* ----- GitHub sync: load and save data/inplace-data.json, upload the day's report ----- */
+  /* ----- GitHub sync: data/inplace-data.json is the shared copy.
+     Every edit saves itself a few seconds later; every open page checks GitHub every few seconds
+     and takes in what other devices saved, with a note of what they changed. ----- */
   const GH = {owner:"bavelly", repo:"inplace-costs", branch:"main", data:"data/inplace-data.json"};
-  const TOKEN_KEY = "inplace-gh-token", SYNC_KEY = "inplace-gh-sync";
+  const TOKEN_KEY = "inplace-gh-token", SYNC_KEY = "inplace-gh-sync", BASE_KEY = "inplace-gh-base", WHO_KEY = "inplace-device-name", LOG_KEY = "inplace-gh-log";
   const ls = { get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
                set(k,v){ try { localStorage.setItem(k,v); } catch(e){} }, del(k){ try { localStorage.removeItem(k); } catch(e){} } };
   let sync = {}; try { sync = JSON.parse(ls.get(SYNC_KEY)) || {}; } catch(e) {}
   const putSync = () => ls.set(SYNC_KEY, JSON.stringify(sync));
   $("ghbar").hidden = false;
   const status = (msg, cls) => { const s = $("ghStatus"); s.textContent = msg; s.className = "note " + (cls||""); };
+  const dot = (cls, text) => { const d = $("ghDot"); d.className = "ghdot " + cls; d.textContent = text; };
   const b64enc = str => { const bytes = new TextEncoder().encode(str); let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(bin); };
   const b64dec = b64 => { const bin = atob(b64.replace(/\s/g,"")); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return new TextDecoder().decode(bytes); };
   const when = iso => new Date(iso).toLocaleString("ar-EG", {dateStyle:"medium", timeStyle:"short"});
+  const clock = iso => new Date(iso).toLocaleTimeString("ar-EG", {hour:"numeric", minute:"2-digit"});
+  const who = () => (ls.get(WHO_KEY) || "").trim() || "جهاز من غير اسم";
+  const api = path => `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${path}`;
+  const hdrs = extra => Object.assign({"Authorization": `Bearer ${ls.get(TOKEN_KEY)}`, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}, extra || {});
   async function gh(path, opts = {}){
-    const token = ls.get(TOKEN_KEY);
-    const res = await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${path}` + (opts.method ? "" : `?ref=${GH.branch}`), {
-      method: opts.method || "GET",
-      headers: {"Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"},
-      body: opts.body ? JSON.stringify(opts.body) : undefined
-    });
+    const res = await fetch(api(path) + (opts.method ? "" : `?ref=${GH.branch}`), {method: opts.method || "GET", cache: "no-store", headers: hdrs(), body: opts.body ? JSON.stringify(opts.body) : undefined});
     if (res.status === 404 && !opts.method && opts.allow404) return null;
     if (!res.ok) { const e = new Error(String(res.status)); e.status = res.status; throw e; }
     return res.json();
   }
+  let etag = null;
+  async function ghPeek(){                       // cheap check: GitHub answers 304 (free) when nothing changed
+    const res = await fetch(api(GH.data) + `?ref=${GH.branch}`, {cache: "no-store", headers: hdrs(etag ? {"If-None-Match": etag} : {})});
+    if (res.status === 304) return null;
+    if (!res.ok) { const e = new Error(String(res.status)); e.status = res.status; throw e; }
+    etag = res.headers.get("ETag"); return res.json();
+  }
   const explain = e => e.status === 401 ? "التوكن غلط أو انتهت صلاحيته. اطلب توكن جديد." :
     e.status === 403 || e.status === 404 ? "التوكن ده مالوش صلاحية على ريبو inplace-costs (لازم Contents: Read and write)." :
-    e.status === 409 || e.status === 422 ? "حد تاني حفظ أرقام على GitHub بعد آخر تحميل عندك. دوس «اتصل وحمّل آخر أرقام» الأول (تعديلاتك اللي مش محفوظة هتروح)." :
-    "مقدرناش نوصل لـ GitHub. اتأكد من النت وجرّب تاني.";
-  function connectedUI(on){
-    $("ghSave").hidden = !on; $("ghForget").hidden = !on;
-    $("ghToken").closest(".inp").hidden = on; $("ghConnect").textContent = on ? "حمّل آخر أرقام من GitHub" : "اتصل وحمّل آخر أرقام";
+    "مقدرناش نوصل لـ GitHub. اتأكد من النت، والحاسبة هتحاول تاني لوحدها.";
+
+  /* --- what changed: plain-language lines for the person watching --- */
+  const UI_KEYS = new Set(["view","cur","savedAt","editedBy","editedAt","seed"]);
+  const L_PART = {name:"الاسم", qty:"العدد", machine:"المكنة", weight:"الوزن", waste:"هالك المصبات", cycle:"زمن الدورة", cav:"العيون", mold:"سعر الاسطمبة", mat:"سعر الخامة", dye:"الصبغة", mix:"الخلطة"};
+  const L_PROD = {carton:"سعر علبة السِت", perCarton:"سِت في العلبة", inner:"التغليف الداخلي", master:"الكرتونة الخارجية", perMaster:"علب في الكرتونة الخارجية", scrap:"القطع المرفوضة", amort:"توزيع الاسطمبات", otherSet:"مصاريف تانية"};
+  const L_PROFIT = {name:"الاسم", cost:"تكلفة المنتج", price:"سعر البيع", disc:"الخصم", pack:"تغليف الشحن", shipOut:"الشحن", shipIn:"شحن العميل", refuse:"المرتجع", retShip:"شحن المرتجع", payPct:"عمولة التحصيل", payFix:"رسوم ثابتة", shopPct:"عمولة Shopify", cpa:"صرف الإعلانات", monthly:"المصاريف الشهرية", orders:"أوردرات الشهر", target:"نسبة الربح المطلوبة", useProd:"ربط تكلفة الإنتاج"};
+  const L_MACH = {brand:"الماركة", tons:"الطن", drive:"نوع الطلمبة", workers:"العمال", extra:"الصيانة/ساعة", motorKw:"الموتور", heaterKw:"السخانات", shotG:"أقصى حقنة"};
+  const L_G = {kwh:"سعر الكيلووات", wage:"مرتب العامل", hours:"ساعات الشهر", dyePct:"نسبة الصبغة"};
+  function describe(a, b){
+    const out = [], same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+    const show = v => v === true ? "أيوه" : v === false ? "لأ" : typeof v === "number" ? (Math.round(v * 100) / 100).toLocaleString("en-US") : String(v ?? "—");
+    const ch = (where, label, x, y) => { if (!same(x, y)) out.push(`${where}${label}: بقى ${show(y)} (كان ${show(x)})`); };
+    Object.keys(L_G).forEach(k => ch("", L_G[k], (a.g || {})[k], (b.g || {})[k]));
+    const byId = arr => Object.fromEntries((arr || []).map(x => [x.id, x]));
+    const am = byId(a.materials), bm = byId(b.materials);
+    Object.values(bm).forEach(m => { const o = am[m.id]; if (!o) out.push(`خامة جديدة: ${m.name}`); else { ch(`${m.name} · `, "سعر الكيلو", o.price, m.price); if (o.name !== m.name) out.push(`اسم الخامة «${o.name}» بقى «${m.name}»`); } });
+    Object.values(am).forEach(m => { if (!bm[m.id]) out.push(`اتشالت خامة: ${m.name}`); });
+    const as = byId(a.sharedAccs), bs = byId(b.sharedAccs);
+    Object.values(bs).forEach(s => { const o = as[s.id]; if (o) ch(`${s.name} · `, "السعر لكل المنتجات", o.price, s.price); });
+    const ak = byId(a.machines), bk = byId(b.machines);
+    Object.values(bk).forEach(m => { const o = ak[m.id]; if (!o) out.push(`مكنة جديدة: ${machineLabel(m)}`); else Object.keys(L_MACH).forEach(k => ch(`مكنة ${machineLabel(o)} · `, L_MACH[k], o[k], m[k])); });
+    Object.values(ak).forEach(m => { if (!bk[m.id]) out.push(`اتشالت مكنة: ${machineLabel(m)}`); });
+    const ap = byId(a.products), bp = byId(b.products);
+    Object.values(bp).forEach(p => {
+      const o = ap[p.id]; if (!o) { out.push(`منتج جديد: ${p.name}`); return; }
+      const nm = p.name || "منتج";
+      Object.keys(L_PROFIT).forEach(k => ch(`${nm} · `, L_PROFIT[k], o[k], p[k]));
+      const op = o.prod || {}, pp = p.prod || {};
+      Object.keys(L_PROD).forEach(k => ch(`${nm} · `, L_PROD[k], op[k], pp[k]));
+      const opts = op.parts || [], npts = pp.parts || [];
+      npts.forEach((pt, i) => { const q = opts[i]; if (!q) { out.push(`${nm} · جزء جديد: ${pt.name}`); return; }
+        Object.keys(L_PART).forEach(k => {
+          if (k === "mix") { if (!same(q.mix, pt.mix)) out.push(`${nm} · ${pt.name}: الخلطة بقت ${mixShort(pt)}`); }
+          else if (k === "machine") { if (q.machine !== pt.machine) out.push(`${nm} · ${pt.name}: المكنة بقت ${machineLabel(b.machines.find(m => m.id === pt.machine) || {})}`); }
+          else ch(`${nm} · ${pt.name || "جزء"} · `, L_PART[k], q[k], pt[k]); }); });
+      if (opts.length > npts.length) out.push(`${nm} · اتشال ${opts.length - npts.length} جزء`);
+      const oa = op.accs || [], na = pp.accs || [];
+      na.forEach((x, i) => { const q = oa[i]; const n = x.sid ? accName(x) : x.name;
+        if (!q) out.push(`${nm} · إكسسوار جديد: ${n}`); else { ch(`${nm} · ${n} · `, "العدد", q.qty, x.qty); if (!x.sid) ch(`${nm} · ${n} · `, "السعر", q.price, x.price); } });
+      if (oa.length > na.length) out.push(`${nm} · اتشال ${oa.length - na.length} إكسسوار`);
+    });
+    Object.values(ap).forEach(p => { if (!bp[p.id]) out.push(`اتشال منتج: ${p.name}`); });
+    return out;
   }
-  async function pull(){
+
+  /* --- three-way merge: my edits since the last sync, laid over what is on GitHub now --- */
+  const isObj = x => x && typeof x === "object" && !Array.isArray(x);
+  // Lists whose items carry an id (products, machines, materials) are matched by id, so adding or removing one
+  // on this device never overwrites what another device changed inside the others.
+  const byIdList = (x, y) => Array.isArray(x) && Array.isArray(y) && [...x, ...y].every(e => isObj(e) && e.id != null);
+  function diffOps(base, cur, path = [], out = []){
+    if (JSON.stringify(base) === JSON.stringify(cur)) return out;
+    if (isObj(base) && isObj(cur)) { new Set([...Object.keys(base), ...Object.keys(cur)]).forEach(k => { if (!(path.length === 0 && UI_KEYS.has(k))) diffOps(base[k], cur[k], [...path, k], out); }); }
+    else if (byIdList(base, cur)) {
+      const bm = new Map(base.map(e => [e.id, e])), cm = new Map(cur.map(e => [e.id, e]));
+      new Set([...bm.keys(), ...cm.keys()]).forEach(id => {
+        if (!bm.has(id)) out.push({path: [...path, {id}], value: cm.get(id)});
+        else if (!cm.has(id)) out.push({path: [...path, {id}], value: undefined});
+        else diffOps(bm.get(id), cm.get(id), [...path, {id}], out);
+      });
+    }
+    else if (Array.isArray(base) && Array.isArray(cur) && base.length === cur.length) cur.forEach((v, i) => diffOps(base[i], v, [...path, i], out));
+    else out.push({path, value: cur});
+    return out;
+  }
+  function applyOps(target, ops){
+    ops.forEach(({path, value}) => {
+      let o = target;
+      for (let i = 0; i < path.length - 1; i++) {
+        const s = path[i];
+        if (isObj(s)) { const it = Array.isArray(o) ? o.find(e => e && e.id === s.id) : null; if (!it) return; o = it; continue; }
+        if (o[s] == null) o[s] = (typeof path[i + 1] === "number" || isObj(path[i + 1])) ? [] : {}; o = o[s];
+      }
+      const k = path[path.length - 1];
+      if (isObj(k)) {
+        if (!Array.isArray(o)) return;
+        const idx = o.findIndex(e => e && e.id === k.id);
+        if (value === undefined) { if (idx >= 0) o.splice(idx, 1); }
+        else if (idx >= 0) o[idx] = structuredClone(value); else o.push(structuredClone(value));
+      } else if (value === undefined) delete o[k]; else o[k] = structuredClone(value);
+    });
+    return target;
+  }
+  const clean = s => { const c = structuredClone(s); UI_KEYS.forEach(k => delete c[k]); return c; };
+
+  /* --- activity log and toast --- */
+  let log = []; try { log = JSON.parse(ls.get(LOG_KEY)) || []; } catch(e) {}
+  function renderLog(){
+    $("ghLog").innerHTML = log.length ? log.map(x => `<li><b>${esc(x.by)}</b> <span class="note">${clock(x.at)}</span><ul>${x.lines.slice(0, 12).map(l => `<li>${esc(l)}</li>`).join("")}${x.lines.length > 12 ? `<li class="note">و${x.lines.length - 12} تعديل تاني</li>` : ""}</ul></li>`).join("")
+      : `<li class="note">لسه مفيش تعديلات من أجهزة تانية.</li>`;
+    $("ghLogCount").textContent = log.length ? `(${log.length})` : "";
+  }
+  function toast(by, lines){
+    const tt = $("toast"); tt.innerHTML = `<b>${esc(by)} عدّل:</b><ul>${lines.slice(0, 4).map(l => `<li>${esc(l)}</li>`).join("")}${lines.length > 4 ? `<li>و${lines.length - 4} تعديل تاني، شوفهم في «آخر التعديلات»</li>` : ""}</ul>`;
+    tt.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => tt.hidden = true, 9000);
+  }
+  $("toast").addEventListener("click", () => $("toast").hidden = true);
+
+  /* --- taking in a newer copy from GitHub --- */
+  let pendingRemote = null;
+  const typing = () => { const a = document.activeElement; return a && a.matches && a.matches("input,select,textarea") && !a.closest("#ghbar"); };
+  function takeRemote(remote, sha, quiet){
+    if (typing()) { pendingRemote = {remote, sha}; return; }   // never yank a field out from under someone typing
+    pendingRemote = null;
+    const before = clean(state), keep = {view: state.view, cur: state.cur};
+    const next = normalizeShared(normalizeMaterials(normalizeMachines(remote)));
+    const lines = quiet ? [] : describe(before, clean(next));
+    state = Object.assign(next, keep); if (!state.products.some(p => p.id === state.cur)) state.cur = state.products[0].id;
+    sync = {sha, dirty: false, at: new Date().toISOString()}; putSync(); ls.set(BASE_KEY, JSON.stringify(clean(state)));
+    save(); renderAll();
+    if (lines.length) {
+      const by = remote.editedBy || "جهاز تاني";
+      log.unshift({by, at: remote.editedAt || new Date().toISOString(), lines}); log = log.slice(0, 30); ls.set(LOG_KEY, JSON.stringify(log)); renderLog();
+      toast(by, lines);
+    }
+  }
+  document.addEventListener("focusout", () => setTimeout(() => { if (pendingRemote && !typing()) takeRemote(pendingRemote.remote, pendingRemote.sha); }, 300));
+
+  async function pull(first){
     status("بيحمّل من GitHub…");
     try {
-      const f = await gh(GH.data);
+      const f = await gh(GH.data); etag = null;
       const s = JSON.parse(b64dec(f.content));
       if (!Array.isArray(s.products) || !Array.isArray(s.machines)) throw new Error("bad");
-      state = normalizeShared(normalizeMaterials(normalizeMachines(s))); if (!state.products.some(p => p.id === state.cur)) state.cur = state.products[0].id;
-      sync = {sha: f.sha, dirty: false, at: new Date().toISOString()}; putSync();
-      save(); renderAll(); connectedUI(true); document.body.classList.remove("locked");
-      status(`اتحمّلت آخر أرقام من GitHub${s.savedAt ? " (متحفظة " + when(s.savedAt) + ")" : ""}.`, "ok");
+      takeRemote(s, f.sha, true);
+      connectedUI(true); document.body.classList.remove("locked"); dot("ok", "متزامن");
+      status(`اتحمّلت آخر أرقام${s.editedBy ? " · آخر تعديل من " + s.editedBy : ""}${s.savedAt ? " " + when(s.savedAt) : ""}. أي تعديل بيتحفظ لوحده، وتعديلات الأجهزة التانية بتوصلك في ثواني.`, "ok");
+      startPolling();
     } catch(e) {
       if (e.message === "bad") status("ملف الأرقام اللي على GitHub مش بالشكل المتوقع.", "err");
       else { status(explain(e), "err"); if (e.status === 401) { ls.del(TOKEN_KEY); connectedUI(false); } }
     }
   }
-  async function push(){
-    const btn = $("ghSave"); btn.disabled = true; status("بيحفظ على GitHub…");
-    const day = stamp();
+
+  /* --- saving: on its own, a few seconds after the last edit --- */
+  let saving = false, saveTimer = null;
+  async function saveData(){
+    if (saving) { scheduleSave(1500); return; }
+    if (!sync.dirty || !ls.get(TOKEN_KEY)) return;
+    saving = true; dot("busy", "بيحفظ…");
+    const stampNow = new Date().toISOString();
+    const body = sha => ({message: `تحديث الأرقام · ${who()}`, branch: GH.branch, sha,
+      content: b64enc(JSON.stringify(Object.assign(clean(state), {savedAt: stampNow, editedBy: who(), editedAt: stampNow}), null, 2))});
     try {
-      state.savedAt = new Date().toISOString();
-      const dataRes = await gh(GH.data, {method:"PUT", body:{
-        message: `تحديث الأرقام ${day}`, branch: GH.branch, sha: sync.sha,
-        content: b64enc(JSON.stringify(state, null, 2))}});
-      sync = {sha: dataRes.content.sha, dirty: false, at: new Date().toISOString()}; putSync(); save();
+      let res;
+      try { res = await gh(GH.data, {method:"PUT", body: body(sync.sha)}); }
+      catch(e) {
+        if (e.status !== 409 && e.status !== 422) throw e;
+        // Someone saved in between: lay my changes over theirs, then save again.
+        const f = await gh(GH.data); const remote = JSON.parse(b64dec(f.content));
+        let base = null; try { base = JSON.parse(ls.get(BASE_KEY)); } catch(x) {}
+        const ops = diffOps(base || clean(remote), clean(state));
+        const merged = applyOps(normalizeShared(normalizeMaterials(normalizeMachines(remote))), ops);
+        const lines = describe(clean(state), clean(merged)).filter(Boolean);
+        state = Object.assign(merged, {view: state.view, cur: state.cur}); save(); renderAll();
+        if (lines.length) { const by = remote.editedBy || "جهاز تاني"; log.unshift({by, at: remote.editedAt || stampNow, lines}); log = log.slice(0, 30); ls.set(LOG_KEY, JSON.stringify(log)); renderLog(); toast(by, lines); }
+        res = await gh(GH.data, {method:"PUT", body: body(f.sha)});
+      }
+      sync = {sha: res.content.sha, dirty: false, at: stampNow}; putSync(); etag = null;
+      ls.set(BASE_KEY, JSON.stringify(clean(state)));
+      dot("ok", "متزامن"); status(`اتحفظ لوحده ${clock(stampNow)}. الأجهزة التانية هتشوف التعديل في ثواني.`, "ok");
+    } catch(e) { dot("err", "مش متحفظ"); status(explain(e), "err"); scheduleSave(15000); }
+    saving = false;
+  }
+  function scheduleSave(ms){ clearTimeout(saveTimer); saveTimer = setTimeout(saveData, ms); }
+
+  /* --- watching: check GitHub every few seconds while the page is open --- */
+  let pollTimer = null;
+  function startPolling(){ clearInterval(pollTimer); pollTimer = setInterval(poll, 8000); }
+  async function poll(){
+    if (document.hidden || !ls.get(TOKEN_KEY) || saving || sync.dirty) return;
+    try {
+      const f = await ghPeek();
+      if (f && f.sha !== sync.sha) takeRemote(JSON.parse(b64dec(f.content)), f.sha);
+      if (!$("ghDot").classList.contains("busy")) dot("ok", "متزامن");
+    } catch(e) { if (e.status === 401) { status(explain(e), "err"); dot("err", "مش متصل"); } }
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
+
+  /* --- the daily report: a button, since it uploads files --- */
+  async function pushReport(){
+    const btn = $("ghSave"); btn.disabled = true;
+    await saveData();
+    const day = stamp(); status("بيرفع تقرير اليوم…");
+    try {
       const rpath = `reports/inplace-cost-report-${day}.csv`;
       const old = await gh(rpath, {allow404:true});
-      await gh(rpath, {method:"PUT", body:{
-        message: `تقرير التكاليف ${day}`, branch: GH.branch, sha: old ? old.sha : undefined,
-        content: b64enc("\ufeff" + reportRows().map(r => r.map(csvCell).join(",")).join("\r\n"))}});
+      await gh(rpath, {method:"PUT", body:{message: `تقرير التكاليف ${day} · ${who()}`, branch: GH.branch, sha: old ? old.sha : undefined,
+        content: b64enc("﻿" + reportRows().map(r => r.map(csvCell).join(",")).join("\r\n"))}});
       let pdfNote = " (Excel و PDF)";
       try {
         const uri = await makePdf("uri");
         const ppath = `reports/inplace-cost-report-${day}.pdf`;
         const oldPdf = await gh(ppath, {allow404:true});
-        await gh(ppath, {method:"PUT", body:{message:`تقرير التكاليف PDF ${day}`, branch: GH.branch, sha: oldPdf ? oldPdf.sha : undefined, content: uri.split(",")[1]}});
+        await gh(ppath, {method:"PUT", body:{message:`تقرير التكاليف PDF ${day} · ${who()}`, branch: GH.branch, sha: oldPdf ? oldPdf.sha : undefined, content: uri.split(",")[1]}});
       } catch(e) { pdfNote = " (Excel بس، الـ PDF ماترفعش)"; }
-      status(`اتحفظت الأرقام واترفع تقرير ${day}${pdfNote} على GitHub · ${when(sync.at)}`, "ok");
+      status(`اترفع تقرير ${day}${pdfNote} على GitHub.`, "ok");
     } catch(e) { status(explain(e), "err"); }
     btn.disabled = false;
   }
+
+  function connectedUI(on){
+    $("ghSave").hidden = !on; $("ghForget").hidden = !on; $("ghLive").hidden = !on;
+    $("ghToken").closest(".inp").hidden = on; $("ghConnect").hidden = on;
+  }
+  $("ghWho").value = ls.get(WHO_KEY) || "";
+  $("ghWho").addEventListener("input", e => ls.set(WHO_KEY, e.target.value));
   $("ghConnect").addEventListener("click", () => {
     const typed = $("ghToken").value.trim();
     if (typed) { ls.set(TOKEN_KEY, typed); $("ghToken").value = ""; }
     if (!ls.get(TOKEN_KEY)) { status("الصق التوكن الأول.", "err"); return; }
-    if (sync.dirty && !$("ghConnect").dataset.armed) {
-      $("ghConnect").dataset.armed = "1"; status("عندك تعديلات مش محفوظة على GitHub. لو حمّلت هتروح. دوس تاني للتأكيد، أو احفظ الأول.", "warn");
-      setTimeout(() => delete $("ghConnect").dataset.armed, 4000); return;
-    }
-    delete $("ghConnect").dataset.armed; pull();
+    pull(true);
   });
-  $("ghSave").addEventListener("click", push);
+  $("ghSave").addEventListener("click", pushReport);
   $("ghForget").addEventListener("click", () => {
-    ls.del(TOKEN_KEY); connectedUI(false);
-    if (PUBLIC) { ls.del(STORE); ls.del(SYNC_KEY); sync = {}; state = EXAMPLE_STATE(); renderAll(); document.body.classList.add("locked"); }
+    ls.del(TOKEN_KEY); clearInterval(pollTimer); connectedUI(false);
+    if (PUBLIC) { [STORE, SYNC_KEY, BASE_KEY, LOG_KEY].forEach(k => ls.del(k)); sync = {}; log = []; state = EXAMPLE_STATE(); renderAll(); document.body.classList.add("locked"); }
     status("اتفصل. التوكن والأرقام اتمسحوا من المتصفح ده.", "");
   });
-  const markDirty = e => { if (e.target.closest && e.target.closest("#ghbar")) return; if (ls.get(TOKEN_KEY)) { sync.dirty = true; putSync(); if (!$("ghStatus").classList.contains("warn")) status("فيه تعديلات لسه مش محفوظة على GitHub.", "warn"); } };
+  const markDirty = e => {
+    if (e.target.closest && e.target.closest("#ghbar")) return;
+    if (!ls.get(TOKEN_KEY)) return;
+    sync.dirty = true; putSync(); dot("busy", "هيتحفظ…"); scheduleSave(2500);
+  };
   document.addEventListener("input", markDirty);
   document.addEventListener("click", e => { if (e.target.closest('[data-act],#addPart,#addAcc,#addMachine,#bulkAdd,#addMat,#dup,#del,#reset,#tabs .add,#useProd')) markDirty(e); });
+  window.addEventListener("beforeunload", e => { if (sync.dirty && ls.get(TOKEN_KEY)) { saveData(); e.preventDefault(); e.returnValue = ""; } });
+  renderLog();
   if (PUBLIC && !ls.get(TOKEN_KEY)) document.body.classList.add("locked");
   if (ls.get(TOKEN_KEY)) {
     connectedUI(true);
-    if (sync.dirty) status("فيه تعديلات لسه مش محفوظة على GitHub.", "warn"); else pull();
+    if (sync.dirty) { dot("busy", "هيتحفظ…"); saveData().then(() => startPolling()); } else pull();
   }
 }
 </script>
