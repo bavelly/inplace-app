@@ -17,7 +17,7 @@
   --body:"IBM Plex Sans Arabic", "Segoe UI", Tahoma, system-ui, sans-serif;
   --seg1:#3c4a5c; --seg2:#7a8797; --seg3:#5f7f9e; --seg4:#b9c3cf; --seg5:#c0634f; --seg6:#8b6aa8; --seg7:#9aa3ad; --seg8:#c9a24e;
   --p1:#2f6fd6; --p2:#0f8a7e; --p3:#7b4fc9; --p4:#d06a12; --p5:#3f8f2f; --p6:#c2378a; --p7:#1d86ad; --p8:#c8463c;
-  --steel:#4a6278; --steel-soft:#e9eef3; --brass-ink:#7a5610;
+  --steel:#4a6278; --steel-soft:#e9eef3; --brass-ink:#7a5610; --on-part:#ffffff;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark){
@@ -27,7 +27,7 @@
     --good:#5cc78f; --good-bg:#16291f; --warn:#e5b04f; --warn-bg:#2d2412; --bad:#f08a80; --bad-bg:#331b19;
     --seg1:#8fa2b8; --seg2:#5d6977; --seg3:#7ea3c6; --seg4:#3f4954; --seg5:#d98270; --seg6:#a98cc4; --seg7:#6c757e; --seg8:#b8913f;
     --p1:#7aa7f2; --p2:#4fc4b6; --p3:#ad8ef0; --p4:#f0a45e; --p5:#82c96e; --p6:#ee7fbf; --p7:#6cc3e4; --p8:#f08a80;
-    --steel:#9fb6cb; --steel-soft:#1f262e; --brass-ink:#e8c47a;
+    --steel:#9fb6cb; --steel-soft:#1f262e; --brass-ink:#e8c47a; --on-part:#14171a;
     color-scheme: dark;
   }
 }
@@ -37,7 +37,7 @@
   --good:#5cc78f; --good-bg:#16291f; --warn:#e5b04f; --warn-bg:#2d2412; --bad:#f08a80; --bad-bg:#331b19;
   --seg1:#8fa2b8; --seg2:#5d6977; --seg3:#7ea3c6; --seg4:#3f4954; --seg5:#d98270; --seg6:#a98cc4; --seg7:#6c757e; --seg8:#b8913f;
   --p1:#7aa7f2; --p2:#4fc4b6; --p3:#ad8ef0; --p4:#f0a45e; --p5:#82c96e; --p6:#ee7fbf; --p7:#6cc3e4; --p8:#f08a80;
-  --steel:#9fb6cb; --steel-soft:#1f262e; --brass-ink:#e8c47a;
+  --steel:#9fb6cb; --steel-soft:#1f262e; --brass-ink:#e8c47a; --on-part:#14171a;
   color-scheme: dark;
 }
 *{box-sizing:border-box}
@@ -160,12 +160,24 @@ fieldset.global legend small{color:var(--steel);opacity:.85}
 fieldset.global .card{background:var(--surface)}
 fieldset.global .card-h b{color:var(--steel);font-size:16px}
 .tagall{font:600 11.5px var(--body);background:var(--steel);color:var(--surface);border-radius:999px;padding:2px 9px}
-/* each part gets its own colour, used on its card and in the results table */
-.card.part{border-inline-start:6px solid var(--pc);padding-top:0;overflow:hidden}
-.card.part > .card-h{background:color-mix(in srgb, var(--pc) 12%, var(--surface));margin:0 -12px;padding:10px 12px;border-bottom:1px solid color-mix(in srgb, var(--pc) 25%, transparent)}
-.card.part > .card-h b{color:var(--pc);font-size:16px;display:flex;align-items:center;gap:8px}
-.pnum{display:inline-grid;place-items:center;min-width:24px;height:24px;border-radius:999px;background:var(--pc);color:#fff;font:700 13px var(--display)}
-.card.part .chip{border-color:color-mix(in srgb, var(--pc) 30%, transparent)}
+/* each part is a solid coloured bar (number, name, key facts, cost per piece); tap to open its fields */
+#parts{gap:14px}
+details.part{border:2px solid color-mix(in srgb, var(--pc) 55%, transparent);border-radius:12px;background:color-mix(in srgb, var(--pc) 5%, var(--surface));overflow:hidden}
+details.part > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--pc);color:var(--on-part)}
+details.part > summary::-webkit-details-marker{display:none}
+details.part > summary:focus-visible{outline:3px solid var(--ink);outline-offset:-3px}
+.pnum{display:inline-grid;place-items:center;min-width:34px;height:34px;border-radius:999px;background:var(--on-part);color:var(--pc);font:700 17px var(--display);flex:none}
+.pmain{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.pname{font:700 18px/1.25 var(--display)}
+.pfacts{font-size:12.5px;opacity:.92;line-height:1.4}
+.pcost{display:flex;flex-direction:column;align-items:center;flex:none;background:color-mix(in srgb, var(--on-part) 18%, transparent);border-radius:10px;padding:4px 10px;font-variant-numeric:tabular-nums}
+.pcost b{font:700 18px var(--display)}
+.pcost small{font-size:11px;opacity:.9}
+.caret{flex:none;font-size:18px;line-height:1;width:18px;text-align:center}
+.caret::before{content:"◂"}
+details.part[open] > summary .caret::before{content:"▾"}
+.pbody{padding:14px;display:flex;flex-direction:column;gap:12px}
+@media (max-width:520px){.pcost{padding:4px 8px}.pname{font-size:16px}}
 .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:6px;vertical-align:middle}
 .rtitle{font:700 15px var(--display);color:var(--brass-ink)}
 .acc:not(.matrow){background:var(--bg);border-radius:10px;padding:8px}
@@ -283,7 +295,8 @@ td .pill{font-size:11.5px}
       </div>
       <hr>
       <fieldset>
-        <legend>الأجزاء اللي بتتحقن <small>كل قطعة في السِت ومكنتها</small></legend>
+        <legend>الأجزاء اللي بتتحقن <small>دوس على أي جزء علشان تفتحه وتعدّله</small></legend>
+        <div style="display:flex;gap:8px;margin-top:-4px"><button type="button" class="btn small" id="openAll">افتح كل الأجزاء</button><button type="button" class="btn small" id="closeAll">اقفلهم</button></div>
         <div class="rowlist" id="parts"></div>
         <button type="button" class="btn ghost" id="addPart">+ إضافة جزء</button>
       </fieldset>
@@ -498,6 +511,7 @@ function catalogSpec(brand, tons){
 }
 function fillFromCatalog(m){ const s = catalogSpec(m.brand, m.tons); if (s) Object.assign(m, s); return m; }
 const autoLine = m => `الموتور <b>${num(m.motorKw)}</b> ك.و · السخانات <b>${num(m.heaterKw)}</b> ك.و · أقصى حقنة <b>${fmt(num(m.shotG))}</b> جم <span>(${esc(m.src || "")})</span>`;
+const openParts = new Set();
 const partColor = i => `var(--p${i % 8 + 1})`;
 const machineLabel = m => `${m.brand && m.brand !== "other" ? BRANDS[m.brand] + " " : ""}${num(m.tons)} طن`;
 /* Materials: shared list with a price per kg; each part uses a blend of them by percent. */
@@ -698,9 +712,14 @@ function renderProdForm(){
   ["carton","perCarton","inner","scrap","amort","otherSet"].forEach(k => $(k).value = pr[k]);
   ["kwh","wage","hours"].forEach(k => $(k).value = state.g[k]);
   $("parts").innerHTML = pr.parts.map((pt,i) => `
-    <div class="card part" data-scope="part" data-i="${i}" style="--pc:${partColor(i)}">
-      <div class="card-h"><b><span class="pnum">${i+1}</span><span class="pname">${esc(pt.name || "جزء")}</span></b><span class="chip" data-out="part-${i}"></span>
-        <button type="button" class="btn small" data-act="delPart" data-i="${i}">حذف</button></div>
+    <details class="part" data-scope="part" data-i="${i}" style="--pc:${partColor(i)}" ${openParts.has(i) ? "open" : ""}>
+      <summary>
+        <span class="pnum">${i+1}</span>
+        <span class="pmain"><b class="pname">${esc(pt.name || "جزء")}</b><span class="pfacts" data-out="part-${i}"></span></span>
+        <span class="pcost" data-cost="part-${i}"></span>
+        <span class="caret" aria-hidden="true"></span>
+      </summary>
+      <div class="pbody">
       <div class="fields">
         ${F("اسم الجزء", `type="text" data-k="name" value="${esc(pt.name)}"`)}
         ${F("العدد في السِت", `type="number" min="0" step="1" data-k="qty" value="${pt.qty}"`, "قطعة")}
@@ -720,7 +739,12 @@ function renderProdForm(){
         ${F("سعر الاسطمبة", `type="number" min="0" step="any" data-k="mold" value="${pt.mold}"`, "جنيه")}
       </div>
       <p class="warnline" data-warn="part-${i}" hidden></p>
-    </div>`).join("");
+      <p class="note" data-kwh="part-${i}" style="border-top:1px dashed color-mix(in srgb, var(--pc) 40%, transparent);padding-top:10px"></p>
+      <div style="display:flex;justify-content:flex-end"><button type="button" class="btn small" data-act="delPart" data-i="${i}">حذف الجزء ده</button></div>
+      </div>
+    </details>`).join("");
+  $("parts").querySelectorAll("details.part").forEach(d => d.addEventListener("toggle", () => {
+    const i = +d.dataset.i; d.open ? openParts.add(i) : openParts.delete(i); }));
   $("accs").innerHTML = pr.accs.length ? pr.accs.map((a,i) => `
     <div class="acc" data-scope="acc" data-i="${i}">
       ${F("البند", `type="text" data-k="name" value="${esc(a.name)}"`)}
@@ -778,7 +802,12 @@ function renderProdResult(){
     return `<tr><td>${id === "_manual" ? "خامة بسعر يدوي" : esc(mt ? mt.name : "؟")}</td><td>${(Math.round(kg*1000)/1000).toLocaleString("en-US")} كجم</td><td>${mt ? fmt1(kg * num(mt.price)) + " ج" : "—"}</td></tr>`; }).join("");
   c.rows.forEach((r,i) => {
     const el = document.querySelector(`[data-out="part-${i}"]`);
-    if (el) el.innerHTML = `القطعة <strong>${fmt1(r.piece)}</strong> جنيه · ${fmt(r.good)} قطعة/ساعة · كهربا ${(Math.round(r.kwhPiece*1000)/1000).toLocaleString("en-US")} ك.و.س`;
+    const pt = cur().prod.parts[i], m = state.machines.find(x => x.id === pt.machine) || {};
+    if (el) el.textContent = `${fmt(num(pt.weight))} جم · ${machineLabel(m)} · ${mixShort(pt)} · ${fmt(r.good)} قطعة/ساعة`;
+    const ke = document.querySelector(`[data-kwh="part-${i}"]`);
+    if (ke) ke.innerHTML = `القطعة بـ <b>${fmt1(r.piece)}</b> ج (خامة ${fmt1(r.mat)} + مكنة ${fmt1(r.mach)}) · بيطلع ${fmt(r.good)} قطعة في الساعة · كهربا القطعة ${(Math.round(r.kwhPiece*1000)/1000).toLocaleString("en-US")} ك.و.س`;
+    const ce = document.querySelector(`[data-cost="part-${i}"]`);
+    if (ce) ce.innerHTML = `<b>${fmt1(r.piece)}</b><small>ج / القطعة</small>`;
     const w = document.querySelector(`[data-warn="part-${i}"]`);
     if (w) { w.hidden = !r.over; if (r.over) w.textContent = `الحقنة حوالي ${fmt(r.over.shot)} جرام وده أكبر من طاقة مكنة ${r.tons} طن (${fmt(r.over.cap)} جرام). اختار مكنة أكبر.`; }
   });
@@ -841,7 +870,7 @@ $("pform").addEventListener("input", e => {
     if (row.dataset.scope === "part") {
       const mr = t.closest(".mixrow");
       if (mr && t.dataset.mk) pr.parts[i].mix[+mr.dataset.j][t.dataset.mk] = t.dataset.mk === "pct" ? val : t.value;
-      else { pr.parts[i][k] = val; if (k === "name") row.querySelector(".card-h .pname").textContent = val || "جزء"; } }
+      else { pr.parts[i][k] = val; if (k === "name") row.querySelector(".pname").textContent = val || "جزء"; } }
     else if (row.dataset.scope === "mat") { state.materials[i][k] = val;
       if (k === "name") document.querySelectorAll('select[data-mk="m"]').forEach(s => { const o = s.querySelector(`option[value="${state.materials[i].id}"]`); if (o) o.textContent = val; }); }
     else if (row.dataset.scope === "acc") pr.accs[i][k] = val;
@@ -885,10 +914,13 @@ $("pform").addEventListener("click", e => {
 });
 $("addPart").addEventListener("click", () => {
   const pr = cur().prod; const last = pr.parts[pr.parts.length-1] || {};
+  openParts.add(pr.parts.length);
   pr.parts.push({name:`جزء ${pr.parts.length+1}`, qty:1, machine:last.machine || state.machines[0].id, weight:300, waste:last.waste ?? 3, mat:last.mat ?? 90,
     mix: last.mix && last.mix.length ? last.mix.map(x => ({...x})) : [{m:"ps_clear", pct:100}], cycle:45, cav:1, mold:0});
   save(); renderProdForm(); refreshNumbers();
 });
+$("openAll").addEventListener("click", () => { cur().prod.parts.forEach((_,i) => openParts.add(i)); renderProdForm(); refreshNumbers(); });
+$("closeAll").addEventListener("click", () => { openParts.clear(); renderProdForm(); refreshNumbers(); });
 $("addMat").addEventListener("click", () => { state.materials.push({id: uid("mt"), name: "خامة جديدة", price: 0}); save(); renderProdForm(); refreshNumbers(); });
 $("addAcc").addEventListener("click", () => { cur().prod.accs.push({name:"بند جديد", price:0, qty:1}); save(); renderProdForm(); refreshNumbers(); });
 const newMachine = (brand, tons) => fillFromCatalog({id:uid("m"), brand, tons, auto:true, drive:"servo", workers:1, extra: Math.round(10 + num(tons) * 0.15), src:""});
@@ -931,6 +963,7 @@ $("tabs").addEventListener("click", e => {
     state.products.push(Object.assign({}, src, {id, name:"منتج جديد", img:null, cost:0, price:0, useProd:true, prod:blankProd()}));
     state.cur = id; state.view = "production";
   } else state.cur = b.dataset.id;
+  openParts.clear();
   save(); renderAll();
   if (b.id === "add") $("pname").select();
 });
